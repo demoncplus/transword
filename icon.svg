@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="110" fill="#4a6cf7"/>
+  <text x="256" y="200" font-size="130" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-weight="bold">A→中</text>
+  <text x="256" y="330" font-size="64" text-anchor="middle" fill="#dbe3ff" font-family="sans-serif">译词通</text>
+  <path d="M150 400 h212" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity="0.6"/>
+</svg>

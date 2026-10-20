@@ -1,0 +1,20 @@
+# 译词通 — 自动生词本翻译器
+
+# ===== 安全：私钥绝对不能进仓库 =====
+# cert/ 里 ca.crt（公开 CA 证书）可以提交（手机安装需要下载）
+# .key 和 server.crt 包含私钥，Github 上公开 = 证书报废
+cert/*.key
+cert/server.crt
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+
+# ===== Node =====
+node_modules/
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db
+Desktop.ini

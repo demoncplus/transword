@@ -40,34 +40,57 @@ function send(method, params) {
   });
 }
 async function evaluate(expression) {
-  const r = await send('Runtime.evaluate', {
-    expression, awaitPromise: true, returnByValue: true, userGesture: true
-  });
-  if (r.exceptionDetails) throw new Error('页面异常: ' + JSON.stringify(r.exceptionDetails.exception));
-  return r.result.value;
+  // SW controllerchange 自动重载会使执行上下文短暂失效；
+  // 此时抛 "navigated or closed"/"Cannot find context"，等待新上下文就绪后重试。
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await send('Runtime.evaluate', {
+        expression, awaitPromise: true, returnByValue: true, userGesture: true
+      });
+      if (r.exceptionDetails) throw new Error('页面异常: ' + JSON.stringify(r.exceptionDetails.exception));
+      return r.result.value;
+    } catch (e) {
+      if (attempt < 30 && /navigated or closed|Cannot find context|Execution context/i.test(e.message)) {
+        await sleep(1000);
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
-// 在页面里输入并等待结果稳定
+// 在页面里输入并等待结果稳定。
+// 注意：不能用单个长 await Promise——SW 更新触发的自动重载会销毁执行上下文，
+// Promise 永不 resolve。改为 Node 侧轮询，每次都是独立短 evaluate，可容错重试。
 async function translate(expr, text, tabs) {
-  return JSON.parse(await evaluate(`(async () => {
-    var sl = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  const prevOut = String(await evaluate("(document.getElementById('result-text').textContent || '')"));
+  await evaluate(`(function () {
     var ta = document.getElementById('src');
     ta.value = ${JSON.stringify(text)};
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     document.getElementById('btn-go').click();
-    var last = '', stable = 0;
-    for (var i = 0; i < 100; i++) {
-      await sl(400);
-      var out = document.getElementById('result-text').textContent || '';
-      if (out && out !== '翻译中…' && out === last) { if (++stable >= 2) break; } else { stable = 0; }
-      last = out;
-    }
-    await sl(700);
+    return 'clicked';
+  })()`);
+  var last = '', stable = 0;
+  for (var i = 0; i < 100; i++) {
+    await sleep(400);
+    var out = String(await evaluate("document.getElementById('result-text').textContent || ''"));
+    // 旧结果恰好稳定会误判"完成"。两个信号说明新查询已接管：
+    //   a) 显示变成了与点击前不同的值（含"翻译中…"）
+    //   b) 结果区标注的原文已是本次查询词（重查同一词时译文可能相同）
+    var srcNow = String(await evaluate("document.getElementById('result-src') ? document.getElementById('result-src').textContent : ''"));
+    var tookOver = out !== prevOut || srcNow === text;
+    if (!tookOver) continue;
+    if (out && out !== '翻译中…' && out === last) { if (++stable >= 2) break; } else { stable = 0; }
+    last = out;
+  }
+  await sleep(700);
+  return JSON.parse(await evaluate(`(function () {
     var v = JSON.parse(localStorage.getItem('tw_vocab') || '[]');
     var rec = null;
     for (var k = 0; k < v.length; k++) { if (v[k] && v[k].src === ${JSON.stringify(text)}) { rec = v[k]; break; } }
     return JSON.stringify({
-      text: last,
+      text: document.getElementById('result-text').textContent || '',
       dict: document.getElementById('result-dict').textContent || '',
       rec: rec,
       first: v[0] ? v[0].src : null,

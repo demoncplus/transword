@@ -375,6 +375,7 @@
 
     resultEl.classList.remove('hidden');
     resultSrc.textContent = text;
+    resultText.textContent = '翻译中…';
     resultDict.innerHTML = '';
     savedTip.classList.add('hidden');
 

@@ -730,11 +730,20 @@
         .then(function (hit) { if (hit && navigator.onLine === false) return dictLoader.loadFull(); })
         .catch(function () {});
     }).catch(function () {});
-    // 新版 sw.js 激活后自动重载一次，避免页面继续跑旧资源
+    // 新版 sw.js 激活后自动重载一次，避免页面继续跑旧资源。
+    // 但不能打断用户正在进行的翻译：首次访问时 SW 激活常发生在第一次查词期间，
+    // 无脑 reload 会把刚出的结果清掉（线上 verify 实测触发）。
+    // 规则：有翻译在途或用户已输入 → 等翻译结束再重载；否则立即重载。
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (window.__swReloaded) return;
       window.__swReloaded = true;
-      location.reload();
+      var tryReload = function () {
+        var busy = reqSeq > 0 && !resultEl.classList.contains('hidden') &&
+                   (resultText.textContent === '翻译中…' || srcEl.value.trim() !== '');
+        if (busy) { setTimeout(tryReload, 1000); return; }
+        location.reload();
+      };
+      setTimeout(tryReload, 500);
     });
   }
 

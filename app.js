@@ -387,9 +387,23 @@
       return;
     }
     var ready = dictLoader.prepare(text, effLang);
+    // 慢网下某个分片可能长时间挂起：8 秒超时后直接走在线翻译链兜底，
+    // 不把结果卡死在"翻译中…"（后台仍会继续下载分片，下一次查询受益）。
+    var timedOut = false;
+    var timeoutId = setTimeout(function () {
+      timedOut = true;
+      if (mySeq === reqSeq) {
+        resultText.textContent = '词典加载较慢';
+        resultDict.innerHTML = '<div style="color:#888;font-size:13px;">⚡ 离线词典分片加载较慢，正在请求在线翻译…</div>';
+        translateOnlineOnly(text, mySeq, effLang, flipped);
+      }
+    }, 8000);
     Promise.resolve(ready).then(function () {
-      if (mySeq === reqSeq) translateLoaded(text, mySeq, effLang, flipped);
+      clearTimeout(timeoutId);
+      if (timedOut || mySeq !== reqSeq) return;
+      translateLoaded(text, mySeq, effLang, flipped);
     }).catch(function () {
+      clearTimeout(timeoutId);
       if (mySeq !== reqSeq) return;
       // 分片网络失败不能当成"词典未收录"，否则会显示误导性的逐词残句。
       resultText.textContent = '词典加载失败';

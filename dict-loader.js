@@ -63,11 +63,17 @@
   function prepareZh(text) {
     var buckets = {};
     var s = String(text || '').trim();
+    // 每个起点 × 长度 1..8 的全组合会命中几乎全部 32 个中文分片：
+    // 慢网络下整句首查要 30+ 个请求、几十秒，等价于把按需加载退化回全量下载。
+    // 只预载长度 1..4 的子串（覆盖单字、单词、常用词组，词典查词的主场景）；
+    // 5 字以上长词组未命中时由在线翻译兜底，后台完整缓存后离线也可查。
     for (var i = 0; i < s.length; i++) {
-      for (var l = 1; l <= Math.min(8, s.length - i); l++) {
+      for (var l = 1; l <= Math.min(4, s.length - i); l++) {
         buckets[zhBucket(s.substring(i, i + l))] = true;
       }
     }
+    // 整句本身可能是词典长词条，单独补上它的分片
+    buckets[zhBucket(s)] = true;
     return Promise.all(Object.keys(buckets).map(function (b) {
       return script('chunks/zh/' + b + '.js', 'zh', b);
     }));

@@ -106,6 +106,12 @@ button:active, .chip:active, .tab:active, .lang-btn:active { transform: scale(0.
 .empty { text-align: center; color: var(--muted); padding: 30px 0; font-size: 14px; }
 
 footer { text-align: center; color: var(--muted); font-size: 12px; padding: 14px; }
+/* 后台离线词典状态提示：默认隐藏，准备中/就绪时显示。
+   不抢眼，仅让用户知道"要不要等一下再断网"。 */
+.offline-status { font-size: 12px; margin-bottom: 6px; }
+.offline-status.loading { color: var(--primary); }
+.offline-status.ready { color: #2ba84a; }
+.offline-status.warn { color: #c8891a; }
 
 @media (prefers-color-scheme: dark) {
   :root { --bg: #14161d; --card: #1e222e; --text: #e8eaf2; --muted: #7c8398; }

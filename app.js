@@ -733,16 +733,37 @@
   };
 
   // ========== PWA ==========
+  var offlineStatusEl = $('offline-status');
+  function setOfflineStatus(text, kind) {
+    if (!offlineStatusEl) return;
+    offlineStatusEl.textContent = text;
+    offlineStatusEl.className = 'offline-status' + (kind ? ' ' + kind : '');
+    offlineStatusEl.classList.remove('hidden');
+  }
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(function () {
       // 先保证首屏和第一次查询快；30 秒后再让 SW 后台缓存完整词典。
       setTimeout(function () {
-        if (navigator.onLine !== false) fetch('prepare-offline').catch(function () {});
+        if (navigator.onLine === false) return;
+        setOfflineStatus('离线词典准备中…', 'loading');
+        fetch('prepare-offline').then(function (r) {
+          return r.json().then(function (j) {
+            if (j && j.ok) setOfflineStatus('✓ 离线词典已就绪（可断网使用）', 'ready');
+            else setOfflineStatus('离线词典稍后自动重试', 'warn');
+          });
+        }).catch(function () {
+          setOfflineStatus('离线词典稍后自动重试', 'warn');
+        });
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
       caches.open('transword-v13').then(function (c) { return c.match('dict.js'); })
-        .then(function (hit) { if (hit && navigator.onLine === false) return dictLoader.loadFull(); })
+        .then(function (hit) {
+          if (hit) {
+            if (navigator.onLine === false) return dictLoader.loadFull();
+            setOfflineStatus('✓ 离线词典已就绪（可断网使用）', 'ready');
+          }
+        })
         .catch(function () {});
     }).catch(function () {});
     // 新版 sw.js 激活后自动重载一次，避免页面继续跑旧资源。

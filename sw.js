@@ -4,7 +4,7 @@
  * 查 fun 会退化成 [fun]），而且连 sw.js 自己都换不掉。
  * 现在同源资源一律先走网络，拿不到（断网）才用缓存，既保证更新即时生效，又保持离线可用。
  */
-var CACHE = 'transword-v13';
+var CACHE = 'transword-v14';
 var ASSETS = [
   './',
   './index.html',

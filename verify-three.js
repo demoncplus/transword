@@ -229,6 +229,19 @@ async function translate(expr, text, tabs) {
 
   check('无未捕获 JS 异常', jsErrors.length === 0, jsErrors.slice(0, 3));
 
+  // 后台离线包：等待最多 45 秒，确认状态提示出现并最终变为"已就绪"
+  console.log('');
+  console.log('【后台离线包】');
+  let offStatus = '', offReady = false;
+  for (let i = 0; i < 90; i++) {
+    await sleep(500);
+    offStatus = String(await evaluate("(document.getElementById('offline-status')||{}).textContent || ''"));
+    if (/已就绪/.test(offStatus) || /准备中/.test(offStatus)) offReady = true;
+    if (/已就绪/.test(offStatus)) break;
+  }
+  check('离线包状态提示已显示（准备中或已就绪）', offReady, offStatus);
+  check('离线包最终已就绪（可断网使用）', /已就绪/.test(offStatus), offStatus);
+
   try {
     await evaluate("document.getElementById('tab-vocab').click(); 'ok'");
     await sleep(700);

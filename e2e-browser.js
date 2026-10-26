@@ -90,23 +90,24 @@ async function evaluate(expression) {
   for (let i = 0; i < 60; i++) {
     await sleep(1000);
     try {
-      const ok = await evaluate("document.readyState === 'complete' && typeof OXFORD_DICT !== 'undefined' && Object.keys(OXFORD_DICT).length > 0");
+      const ok = await evaluate("document.readyState === 'complete' && typeof TW_DICT_LOADER !== 'undefined'");
       if (ok) break;
     } catch (_) {}   // 页面正在重载时上下文会失效，忽略后重试
   }
   await sleep(4000);   // 留出 SW controllerchange 自动重载的窗口
   for (let i = 0; i < 40; i++) {
     try {
-      if (await evaluate("typeof OXFORD_DICT !== 'undefined' && Object.keys(OXFORD_DICT).length > 0")) break;
+      if (await evaluate("typeof TW_DICT_LOADER !== 'undefined'")) break;
     } catch (_) {}
     await sleep(1000);
   }
 
   console.log('== A. 页面与词典装载 ==');
+  // 分片按需加载：首屏允许词典对象为空，第一次查询后才验证词条命中。
   const meta = await evaluate(`JSON.stringify({
     dict: Object.keys(OXFORD_DICT).length,
     cn: Object.keys(CN_DICT).length,
-    fun: OXFORD_DICT['fun'],
+    hasLoader: typeof TW_DICT_LOADER !== 'undefined',
     hasApiInput: !!document.getElementById('api-url'),
     hasBuildInfo: !!document.getElementById('build-info'),
     hasResetBtn: !!document.getElementById('btn-reset-cache'),
@@ -121,9 +122,8 @@ async function evaluate(expression) {
              .reduce(function (a, r) { return Math.max(a, r.responseEnd || 0); }, 0))
   })`);
   const m = JSON.parse(meta);
-  check('离线词典装载（>20000 条）', m.dict > 20000, m.dict);
-  check('汉英词典装载（>1000 条）', m.cn > 1000, m.cn);
-  check('常见词 fun 有中文释义', /[\u4e00-\u9fff]/.test(m.fun || ''), m.fun);
+  check('按需词典加载器已就绪', m.hasLoader === true, m);
+  check('首屏没有加载完整词典（应为 0 条，查询后按需装载）', m.dict === 0 && m.cn === 0, m);
   console.log('  ℹ 词典传输 ' + (m.bytes / 1048576).toFixed(2) + ' MB，加载完成于 ' + m.ms + ' ms');
   // 词典体积须可控：离线 PWA 首次加载不应过重
   check('词典总体积在 4 MB 以内', m.bytes < 4 * 1048576, (m.bytes / 1048576).toFixed(2) + ' MB');
@@ -147,7 +147,7 @@ async function evaluate(expression) {
   await sleep(6000);
   for (let i = 0; i < 40; i++) {
     try {
-      if (await evaluate("document.readyState === 'complete' && typeof OXFORD_DICT !== 'undefined' && Object.keys(OXFORD_DICT).length > 0")) break;
+      if (await evaluate("document.readyState === 'complete' && typeof TW_DICT_LOADER !== 'undefined'")) break;
     } catch (_) {}
     await sleep(1000);
   }
@@ -163,12 +163,16 @@ async function evaluate(expression) {
       await sleep(300);
       g('src').value = text;
       g('btn-go').click();
-      var last = '', stable = 0;
+      // 等待最终态：词典立即出结果，在线源 2-8 秒后可能覆盖。
+      // 只等"显示稳定 1 秒"会在覆盖点前后读到中间态，显示与生词本内容不一致（测试 race）。
+      var last = '', stable = 0, final = false;
       for (var i = 0; i < 200; i++) {
         await sleep(500);
         var out = g('result-text').textContent || '';
+        var note = (g('result-dict').innerHTML || '').replace(/<[^>]+>/g, ' ');
+        if (/句子级翻译|逐词直译|未收录|引擎未启动/.test(note)) final = true;
         if (out && out !== '翻译中…' && out === last) {
-          if (++stable >= 2) break;
+          if (++stable >= 2 && final) break;
         } else { stable = 0; }
         last = out;
       }

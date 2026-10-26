@@ -41,12 +41,12 @@ function check(n, c, x) { if (c) { pass++; console.log('  ✓ ' + n); } else { f
 
   for (let i = 0; i < 60; i++) {
     await sleep(1000);
-    if (await ev("document.readyState==='complete' && typeof OXFORD_DICT!=='undefined'")) break;
+    if (await ev("document.readyState==='complete' && typeof TW_DICT_LOADER!=='undefined'")) break;
   }
   await ev("localStorage.clear(); location.reload(); 'ok'");
   await sleep(7000);
   for (let i = 0; i < 40; i++) {
-    if (await ev("document.readyState==='complete' && typeof OXFORD_DICT!=='undefined'")) break;
+    if (await ev("document.readyState==='complete' && typeof TW_DICT_LOADER!=='undefined'")) break;
     await sleep(1000);
   }
   // 注入辅助函数。reload 会清空页面上下文，所以这个动作要能重复执行。
@@ -60,14 +60,19 @@ function check(n, c, x) { if (c) { pass++; console.log('  ✓ ' + n); } else { f
       if (!cur || cur.id !== want) g(want).click();
       await sl(400);
       g('src').value = text; g('btn-go').click();
-      var last = '', stable = 0;
+      // 等待"最终态"：翻译链是 词典立即出结果 → 在线源 2-8 秒后可能覆盖。
+      // 只等显示稳定 1 秒会在覆盖点前后读到中间态，显示与存库不一致（纯测试 race）。
+      // 终态判据：note 出现"句子级翻译"（在线覆盖）或"逐词直译/未收录"（在线全部失败）。
+      var last = '', stable = 0, final = false;
       for (var i = 0; i < 160; i++) {
         await sl(500);
         var out = g('result-text').textContent || '';
-        if (out && out !== '翻译中…' && out === last) { if (++stable >= 2) break; } else { stable = 0; }
+        var note = (g('result-dict').innerHTML || '').replace(/<[^>]+>/g, ' ');
+        if (/句子级翻译|逐词直译|未收录|引擎未启动/.test(note)) { final = true; }
+        if (out && out !== '翻译中…' && out === last) { if (++stable >= 2 && final) break; } else { stable = 0; }
         last = out;
       }
-      await sl(1200);
+      await sl(800);
       return { text: last, note: (g('result-dict').innerHTML || '').replace(/<[^>]+>/g, ' ').trim() };
     };
     'ready'

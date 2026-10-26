@@ -4,14 +4,13 @@
  * 查 fun 会退化成 [fun]），而且连 sw.js 自己都换不掉。
  * 现在同源资源一律先走网络，拿不到（断网）才用缓存，既保证更新即时生效，又保持离线可用。
  */
-var CACHE = 'transword-v12';
+var CACHE = 'transword-v13';
 var ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './dict.js',
-  './cn-dict.js',
+  './dict-loader.js',
   './manifest.json',
   './icon.svg',
   './icon-192.png',
@@ -48,6 +47,23 @@ self.addEventListener('fetch', function (e) {
   // 跨域（翻译接口等）：只走网络，绝不缓存
   if (url.origin !== self.location.origin) {
     e.respondWith(fetch(req));
+    return;
+  }
+
+  // 完整词典不随首屏下载，避免抢占首次查询的网络。
+  // 页面停留 30 秒后通知 SW 后台缓存；下载完成后断网重开也能使用完整词典。
+  if (url.pathname.indexOf('/prepare-offline') >= 0) {
+    e.respondWith(
+      caches.open(CACHE).then(function (c) {
+        return c.addAll(['./dict.js', './cn-dict.js']);
+      }).then(function () {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }).catch(function () {
+        return new Response(JSON.stringify({ ok: false }), { status: 503 });
+      })
+    );
     return;
   }
 

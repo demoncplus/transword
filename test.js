@@ -61,8 +61,11 @@ global.location = {
 };
 
 // ---------- 加载应用 ----------
+// 默认仍加载完整词典，保证所有旧翻译用例对两种加载方式都有效；
+// 第 13 节另起分片模式，验证页面不再首屏下载完整词典。
 vm.runInThisContext(fs.readFileSync('dict.js', 'utf8'), { filename: 'dict.js' });
 vm.runInThisContext(fs.readFileSync('cn-dict.js', 'utf8'), { filename: 'cn-dict.js' });
+global.window.TW_DICT_LOADER = null;
 
 // app.js 是 IIFE，只在加载时读一次 localStorage。
 // 要验证"带着已有生词本启动"的行为（脏数据清洗、重查置顶），
@@ -120,7 +123,11 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('提示正在尝试翻译源', /正在尝试更准确的翻译源/.test(elements['result-dict'].innerHTML));
 
   console.log('== 2. 英译汉：联网精翻覆盖 ==');
-  await sleep(5000);
+  // MyMemory 偶发慢：固定 sleep 5 秒会在网络抖动时误报失败。
+  // 改为轮询等待在线结果（最多 20 秒），既稳定又不掩盖真实超时。
+  for (let w = 0; w < 40 && !/免费接口.*句子级翻译/.test(elements['result-dict'].innerHTML); w++) {
+    await sleep(500);
+  }
   const online = elements['result-text'].textContent;
   check('联网翻译结果含"天气"', /天气/.test(online), online);
   check('标注免费接口精翻', /免费接口.*句子级翻译/.test(elements['result-dict'].innerHTML), elements['result-dict'].innerHTML);
@@ -661,6 +668,41 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
         mf.display === 'standalone' && Array.isArray(mf.icons) && mf.icons.length >= 2 && !!mf.start_url,
         { display: mf.display, icons: mf.icons.length, start_url: mf.start_url });
   check('12k 不依赖 hover 才能操作（触屏可完成全部操作）', !/\.\.\.:hover[^{]*\{[^}]*display:\s*(block|flex)/.test(css));
+
+  console.log('\n== 13. 按需词典分片：词条内容不丢失 ==');
+  // 分片构建必须保留完整词典的每一条、每一个字，不能只是"大约一样"。
+  const chunkIndex = JSON.parse(fs.readFileSync('chunks/index.json', 'utf8'));
+  const chunkSandbox = {};
+  vm.createContext(chunkSandbox);
+  vm.runInContext(fs.readFileSync('dict.js', 'utf8'), chunkSandbox);
+  vm.runInContext(fs.readFileSync('cn-dict.js', 'utf8'), chunkSandbox);
+  const mergedEn = {}, mergedZh = {};
+  Object.values(chunkIndex.chunks).forEach(meta => {
+    const code = fs.readFileSync(meta.url, 'utf8');
+    const m = code.match(/g\.(TW_(?:EN|ZH)_CHUNK)=(\{[\s\S]*\});\}\)\(this\);/);
+    if (!m) throw new Error('无法解析分片 ' + meta.url);
+    const data = JSON.parse(m[2]);
+    Object.assign(m[1] === 'TW_EN_CHUNK' ? mergedEn : mergedZh, data);
+  });
+  check('13a 英文分片数量与完整词典一致',
+        Object.keys(mergedEn).length === Object.keys(chunkSandbox.OXFORD_DICT).length,
+        Object.keys(mergedEn).length);
+  check('13b 中文分片数量与完整词典一致',
+        Object.keys(mergedZh).length === Object.keys(chunkSandbox.CN_DICT).length,
+        Object.keys(mergedZh).length);
+  check('13c 英文分片词条内容逐字一致',
+        Object.keys(chunkSandbox.OXFORD_DICT).every(k => mergedEn[k] === chunkSandbox.OXFORD_DICT[k]));
+  check('13d 中文分片词条内容逐字一致',
+        Object.keys(chunkSandbox.CN_DICT).every(k => mergedZh[k] === chunkSandbox.CN_DICT[k]));
+  check('13e 首屏不再同步下载完整词典',
+        !/<script src="dict\.js/.test(htmlSrc) && !/<script src="cn-dict\.js/.test(htmlSrc) &&
+        /<script src="dict-loader\.js/.test(htmlSrc));
+  check('13f Service Worker 首屏也不预下载完整词典',
+        !/ASSETS[\s\S]*?'\.\/dict\.js'/.test(fs.readFileSync('sw.js', 'utf8').split('self.addEventListener')[0]));
+  check('13g 页面空闲后仍后台准备完整离线词典',
+        /prepare-offline/.test(fs.readFileSync('app.js', 'utf8')) &&
+        /dict\.js/.test(fs.readFileSync('sw.js', 'utf8')) &&
+        /cn-dict\.js/.test(fs.readFileSync('sw.js', 'utf8')));
 
   console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
   process.exit(fail ? 1 : 0);

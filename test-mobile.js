@@ -104,7 +104,7 @@ async function evaluate(expression) {
 
   await sleep(8000);
   for (let i = 0; i < 40; i++) {
-    const ready = await evaluate("document.readyState==='complete' && typeof OXFORD_DICT!=='undefined'");
+    const ready = await evaluate("document.readyState==='complete' && typeof TW_DICT_LOADER!=='undefined'");
     if (ready === true) break;
     await sleep(1000);
   }

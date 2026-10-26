@@ -80,8 +80,8 @@ function get(url, opts) {
   check('sw.js 的 install 预缓存真正被 waitUntil 等待（否则可能来不及缓存就结束）',
         /e\.waitUntil\([\s\S]{0,200}caches\.open/.test(sw));
   check('sw.js 有 fetch 拦截并回退缓存', /addEventListener\(\s*['"]fetch['"]/.test(sw));
-  check('sw.js 预缓存包含词典（离线查词的前提）', /dict\.js/.test(sw) && /cn-dict\.js/.test(sw));
-  check('sw.js 预缓存包含首页与脚本', /index\.html/.test(sw) && /app\.js/.test(sw) && /style\.css/.test(sw));
+  check('sw.js 保留完整词典的后台离线缓存（首屏不强制下载）', /dict\.js/.test(sw) && /cn-dict\.js/.test(sw));
+  check('sw.js 首屏预缓存包含页面与按需加载器', /index\.html/.test(sw) && /app\.js/.test(sw) && /style\.css/.test(sw) && /dict-loader\.js/.test(sw));
 
   // 5. 默认地址必须是同源 /engine 或本机直连，不能指向 localhost:8766 的绝对 http
   const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8');

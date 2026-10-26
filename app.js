@@ -11,9 +11,10 @@
   var LS_LANG = 'tw_lang'; // 当前翻译方向
   var LS_API = 'tw_api';   // 自建翻译接口地址
 
-  // ========== 词典数据 ==========
+  // 词典数据：完整版在本地/后台离线缓存中可用；公网首访按需加载分片。
   var DICT = (typeof OXFORD_DICT !== 'undefined') ? OXFORD_DICT : {};
   var CN_DICT = (typeof window.CN_DICT !== 'undefined') ? window.CN_DICT : {};
+  var dictLoader = (typeof window.TW_DICT_LOADER !== 'undefined') ? window.TW_DICT_LOADER : null;
 
   // 当前翻译方向: 'en2zh' 或 'zh2en'
   var currentLang = localStorage.getItem(LS_LANG) || 'en2zh';
@@ -377,6 +378,50 @@
     resultDict.innerHTML = '';
     savedTip.classList.add('hidden');
 
+    // 公网首访只下载当前查询涉及的词典分片，而不是首屏下载全部 2.9MB。
+    // 完整词典由 Service Worker 在后台缓存；下载完成后断网也可用。
+    // 本地已带完整词典时保持同步返回；公网分片模式才需要等待加载。
+    if (!dictLoader) {
+      translateLoaded(text, mySeq, effLang, flipped);
+      return;
+    }
+    var ready = dictLoader.prepare(text, effLang);
+    Promise.resolve(ready).then(function () {
+      if (mySeq === reqSeq) translateLoaded(text, mySeq, effLang, flipped);
+    }).catch(function () {
+      if (mySeq !== reqSeq) return;
+      // 分片网络失败不能当成"词典未收录"，否则会显示误导性的逐词残句。
+      resultText.textContent = '词典加载失败';
+      resultDict.innerHTML = '<div style="color:#c8891a;font-size:13px;">' +
+        '词典分片暂时无法下载，正在尝试在线翻译；联网后重查即可使用离线词典。</div>';
+      translateOnlineOnly(text, mySeq, effLang, flipped);
+    });
+  }
+
+  function translateOnlineOnly(text, mySeq, effLang, flipped) {
+    var langpair = effLang === 'zh2en' ? 'zh-CN|en' : 'en|zh-CN';
+    var api = getApiUrl();
+    var chain = api ? customTranslate(api, text, langpair) : Promise.resolve(null);
+    chain.then(function (r) {
+      return r ? { text: r, source: '🏠 自建接口' } : onlineTranslate(text, langpair).then(function (x) {
+        return x ? { text: x, source: '🌐 免费接口（MyMemory）' } : null;
+      });
+    }).then(function (best) {
+      if (mySeq !== reqSeq) return;
+      if (best) {
+        resultText.textContent = best.text;
+        resultDict.innerHTML = '<div style="color:#2ba84a;font-size:13px;">' + best.source + ' · 句子级翻译</div>';
+        addToVocab(text, best.text, true, effLang);
+        savedTip.classList.remove('hidden');
+      } else {
+        resultText.textContent = '暂无翻译';
+        addToVocab(text, '', true, effLang, 'pending');
+      }
+    });
+  }
+
+  function translateLoaded(text, mySeq, effLang, flipped) {
+
     // 第一步：离线词典，立即出结果
     var res = translateAs(text, effLang);
     if (!res) {
@@ -674,7 +719,17 @@
 
   // ========== PWA ==========
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(function () {});
+    navigator.serviceWorker.register('sw.js').then(function () {
+      // 先保证首屏和第一次查询快；30 秒后再让 SW 后台缓存完整词典。
+      setTimeout(function () {
+        if (navigator.onLine !== false) fetch('prepare-offline').catch(function () {});
+      }, 30000);
+      // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
+      if (!dictLoader || !window.caches) return;
+      caches.open('transword-v13').then(function (c) { return c.match('dict.js'); })
+        .then(function (hit) { if (hit && navigator.onLine === false) return dictLoader.loadFull(); })
+        .catch(function () {});
+    }).catch(function () {});
     // 新版 sw.js 激活后自动重载一次，避免页面继续跑旧资源
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (window.__swReloaded) return;

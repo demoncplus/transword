@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "zhBuckets": 32,
+  "chunks": {
+    "en/a": {
+      "url": "chunks/en/a.js",
+      "entries": 1420,
+      "bytes": 69406
+    },
+    "en/b": {
+      "url": "chunks/en/b.js",
+      "entries": 1392,
+      "bytes": 64688
+    },
+    "en/c": {
+      "url": "chunks/en/c.js",
+      "entries": 2250,
+      "bytes": 115873
+    },
+    "en/d": {
+      "url": "chunks/en/d.js",
+      "entries": 1425,
+      "bytes": 71618
+    },
+    "en/e": {
+      "url": "chunks/en/e.js",
+      "entries": 1015,
+      "bytes": 52219
+    },
+    "en/f": {
+      "url": "chunks/en/f.js",
+      "entries": 991,
+      "bytes": 54273
+    },
+    "en/g": {
+      "url": "chunks/en/g.js",
+      "entries": 791,
+      "bytes": 39196
+    },
+    "en/h": {
+      "url": "chunks/en/h.js",
+      "entries": 957,
+      "bytes": 46081
+    },
+    "en/i": {
+      "url": "chunks/en/i.js",
+      "entries": 1051,
+      "bytes": 55946
+    },
+    "en/j": {
+      "url": "chunks/en/j.js",
+      "entries": 219,
+      "bytes": 11758
+    },
+    "en/k": {
+      "url": "chunks/en/k.js",
+      "entries": 251,
+      "bytes": 11651
+    },
+    "en/l": {
+      "url": "chunks/en/l.js",
+      "entries": 780,
+      "bytes": 40398
+    },
+    "en/m": {
+      "url": "chunks/en/m.js",
+      "entries": 1337,
+      "bytes": 66084
+    },
+    "en/n": {
+      "url": "chunks/en/n.js",
+      "entries": 478,
+      "bytes": 24010
+    },
+    "en/o": {
+      "url": "chunks/en/o.js",
+      "entries": 575,
+      "bytes": 30501
+    },
+    "en/p": {
+      "url": "chunks/en/p.js",
+      "entries": 1902,
+      "bytes": 109380
+    },
+    "en/q": {
+      "url": "chunks/en/q.js",
+      "entries": 113,
+      "bytes": 5984
+    },
+    "en/r": {
+      "url": "chunks/en/r.js",
+      "entries": 1255,
+      "bytes": 71405
+    },
+    "en/s": {
+      "url": "chunks/en/s.js",
+      "entries": 2635,
+      "bytes": 146664
+    },
+    "en/t": {
+      "url": "chunks/en/t.js",
+      "entries": 1275,
+      "bytes": 66689
+    },
+    "en/u": {
+      "url": "chunks/en/u.js",
+      "entries": 922,
+      "bytes": 53020
+    },
+    "en/v": {
+      "url": "chunks/en/v.js",
+      "entries": 330,
+      "bytes": 17564
+    },
+    "en/w": {
+      "url": "chunks/en/w.js",
+      "entries": 648,
+      "bytes": 35648
+    },
+    "en/x": {
+      "url": "chunks/en/x.js",
+      "entries": 15,
+      "bytes": 785
+    },
+    "en/y": {
+      "url": "chunks/en/y.js",
+      "entries": 74,
+      "bytes": 3600
+    },
+    "en/z": {
+      "url": "chunks/en/z.js",
+      "entries": 52,
+      "bytes": 2666
+    },
+    "zh/0": {
+      "url": "chunks/zh/0.js",
+      "entries": 1827,
+      "bytes": 47608
+    },
+    "zh/1": {
+      "url": "chunks/zh/1.js",
+      "entries": 1902,
+      "bytes": 49927
+    },
+    "zh/10": {
+      "url": "chunks/zh/10.js",
+      "entries": 1838,
+      "bytes": 47598
+    },
+    "zh/11": {
+      "url": "chunks/zh/11.js",
+      "entries": 1895,
+      "bytes": 50276
+    },
+    "zh/12": {
+      "url": "chunks/zh/12.js",
+      "entries": 1769,
+      "bytes": 46397
+    },
+    "zh/13": {
+      "url": "chunks/zh/13.js",
+      "entries": 1989,
+      "bytes": 52153
+    },
+    "zh/14": {
+      "url": "chunks/zh/14.js",
+      "entries": 1815,
+      "bytes": 47163
+    },
+    "zh/15": {
+      "url": "chunks/zh/15.js",
+      "entries": 1904,
+      "bytes": 50123
+    },
+    "zh/16": {
+      "url": "chunks/zh/16.js",
+      "entries": 1889,
+      "bytes": 48746
+    },
+    "zh/17": {
+      "url": "chunks/zh/17.js",
+      "entries": 2006,
+      "bytes": 52368
+    },
+    "zh/18": {
+      "url": "chunks/zh/18.js",
+      "entries": 1871,
+      "bytes": 48886
+    },
+    "zh/19": {
+      "url": "chunks/zh/19.js",
+      "entries": 1928,
+      "bytes": 50580
+    },
+    "zh/2": {
+      "url": "chunks/zh/2.js",
+      "entries": 1822,
+      "bytes": 47822
+    },
+    "zh/20": {
+      "url": "chunks/zh/20.js",
+      "entries": 1864,
+      "bytes": 48637
+    },
+    "zh/21": {
+      "url": "chunks/zh/21.js",
+      "entries": 2029,
+      "bytes": 52757
+    },
+    "zh/22": {
+      "url": "chunks/zh/22.js",
+      "entries": 1816,
+      "bytes": 47235
+    },
+    "zh/23": {
+      "url": "chunks/zh/23.js",
+      "entries": 1883,
+      "bytes": 49722
+    },
+    "zh/24": {
+      "url": "chunks/zh/24.js",
+      "entries": 1871,
+      "bytes": 48847
+    },
+    "zh/25": {
+      "url": "chunks/zh/25.js",
+      "entries": 1890,
+      "bytes": 49865
+    },
+    "zh/26": {
+      "url": "chunks/zh/26.js",
+      "entries": 1837,
+      "bytes": 47364
+    },
+    "zh/27": {
+      "url": "chunks/zh/27.js",
+      "entries": 1861,
+      "bytes": 49112
+    },
+    "zh/28": {
+      "url": "chunks/zh/28.js",
+      "entries": 1840,
+      "bytes": 47791
+    },
+    "zh/29": {
+      "url": "chunks/zh/29.js",
+      "entries": 1917,
+      "bytes": 50689
+    },
+    "zh/3": {
+      "url": "chunks/zh/3.js",
+      "entries": 1843,
+      "bytes": 48087
+    },
+    "zh/30": {
+      "url": "chunks/zh/30.js",
+      "entries": 1843,
+      "bytes": 47953
+    },
+    "zh/31": {
+      "url": "chunks/zh/31.js",
+      "entries": 1893,
+      "bytes": 50046
+    },
+    "zh/4": {
+      "url": "chunks/zh/4.js",
+      "entries": 1776,
+      "bytes": 46478
+    },
+    "zh/5": {
+      "url": "chunks/zh/5.js",
+      "entries": 2097,
+      "bytes": 54918
+    },
+    "zh/6": {
+      "url": "chunks/zh/6.js",
+      "entries": 1857,
+      "bytes": 48676
+    },
+    "zh/7": {
+      "url": "chunks/zh/7.js",
+      "entries": 1885,
+      "bytes": 49736
+    },
+    "zh/8": {
+      "url": "chunks/zh/8.js",
+      "entries": 1841,
+      "bytes": 48029
+    },
+    "zh/9": {
+      "url": "chunks/zh/9.js",
+      "entries": 1882,
+      "bytes": 49542
+    }
+  }
+}

@@ -88,6 +88,11 @@ async function ev(expression) {
   const zhAgain = await query('知识', 'zh2en');
   check('中文重复查询复用已下载分片', zhAgain.chunks.length === zh.chunks.length, zhAgain.chunks);
   check('中文查询写入生词本', zh.hit, zh);
+  // 中文长整句首查：分片数必须受控（远小于 32 个全部分片），否则退化为全量下载
+  const longZh = await query('请问洗手间在哪里？', 'zh2en');
+  const longChunks = longZh.chunks.filter(u => /chunks\/zh\//.test(u)).length;
+  check('中文长整句首查分片数受控（<32 全部分片）', longChunks < 32, { longChunks, text: longZh.text });
+  check('中文长整句首查不拉取整本中文词典', longZh.zh < 40000, { zh: longZh.zh });
 
   // 让 SW 后台准备完整词典，再真正断网重载。
   await send('Page.navigate', { url: new URL('prepare-offline', URL_).href });

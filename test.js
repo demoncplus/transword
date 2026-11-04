@@ -579,6 +579,18 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('11c3 HTTPS 下引擎地址不含 http://（混合内容会被浏览器拦掉）',
         !/^http:\/\//.test(httpsApi), httpsApi);
 
+  // VPS 线上版：页面部署在 107-175-122-81.sslip.io，引擎走同源 /transword-engine/
+  global.location = {
+    protocol: 'https:', hostname: '107-175-122-81.sslip.io', host: '107-175-122-81.sslip.io',
+    href: 'https://107-175-122-81.sslip.io/transword/index.html', origin: 'https://107-175-122-81.sslip.io'
+  };
+  boot();
+  const vpsApi = window.TW_DEBUG.getApiUrl();
+  check('11c4 VPS 线上版 → 引擎走同源 /transword-engine/',
+        vpsApi === 'https://107-175-122-81.sslip.io/transword-engine/translate', vpsApi);
+  check('11c5 VPS 线上版 → 引擎同源无跨域',
+        vpsApi.indexOf('https://107-175-122-81.sslip.io') === 0, vpsApi);
+
   // 自定义地址优先级仍要高于自动推断
   store['tw_api'] = 'http://10.0.0.9:9999/translate';
   boot();

@@ -167,6 +167,15 @@
   //   HTTPS 下（手机离线安装需要）也不会因为 http:// 而被当混合内容拦掉。
   // 只有 file:// 直接打开、没有服务器可代理时，才直连本机 8766。
   var API_PORT = 8766;
+  // 线上运行位置：'vps'（部署在 107-175-122-81.sslip.io，同源）/'github'（GitHub Pages，跨域）/''
+  function onlineHost() {
+    try {
+      var h = (location && location.hostname) || '';
+      if (/sslip\.io$/.test(h)) return 'vps';
+      if (/demoncplus\.github\.io$/.test(h)) return 'github';
+      return '';
+    } catch (e) { return ''; }
+  }
   function sameOriginEngine() {
     try {
       if (typeof location === 'undefined') return '';
@@ -177,10 +186,10 @@
     } catch (e) { return ''; }
   }
   function defaultApiUrl() {
-    // GitHub Pages 线上版直接使用隔离 VPS 引擎；本地/局域网仍保留原有同源代理。
-    try {
-      if (location && /demoncplus\.github\.io$/.test(location.hostname)) return REMOTE_ENGINE;
-    } catch (e) {}
+    // VPS 线上版：页面/引擎/同步同源，走 /transword-engine/ 反代（无跨域、最快）
+    if (onlineHost() === 'vps') return location.origin + '/transword-engine/translate';
+    // GitHub Pages 备份入口：跨域直连 VPS 引擎
+    if (onlineHost() === 'github') return REMOTE_ENGINE;
     var same = sameOriginEngine();
     if (same) return same;
     return 'http://localhost:' + API_PORT + '/translate';
@@ -566,6 +575,10 @@
       info.classList.add('hidden');
     }
   }
+  function syncBaseUrl() {
+    // VPS 线上版同源；GitHub Pages 备份入口跨域直连
+    return onlineHost() === 'vps' ? (location.origin + '/transword-sync') : SYNC_BASE;
+  }
   function syncApi(path, method, body, withAuth) {
     var opts = { method: method || 'GET', headers: {} };
     if (body !== undefined) {
@@ -574,7 +587,7 @@
     }
     var token = syncToken();
     if (withAuth !== false && token) opts.headers['Authorization'] = 'Bearer ' + token;
-    return fetch(SYNC_BASE + path, opts).then(function (r) {
+    return fetch(syncBaseUrl() + path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
           var err = new Error((j && j.error) || ('http-' + r.status));
@@ -610,8 +623,7 @@
       .sort(function (x, y) { return (y.ts || 0) - (x.ts || 0); });
   }
   function isOnlinePage() {
-    try { return location && /demoncplus\.github\.io$/.test(location.hostname); }
-    catch (e) { return false; }
+    return onlineHost() === 'vps' || onlineHost() === 'github';
   }
   function syncSetStatus(text, kind) {
     var el = $('sync-status');
@@ -929,7 +941,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v17').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v18').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

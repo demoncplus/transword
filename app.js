@@ -10,10 +10,11 @@
   var LS_HISTORY = 'tw_history';
   var LS_LANG = 'tw_lang'; // 当前翻译方向
   var LS_API = 'tw_api';   // 自建翻译接口地址
-  var LS_SYNC_CODE = 'tw_sync_code';
+  var LS_TOKEN = 'tw_sync_token';   // 登录令牌（90 天有效，实现"保持登录"）
+  var LS_USER = 'tw_sync_user';
   var REMOTE_ENGINE = 'https://107-175-122-81.sslip.io/transword-engine/translate';
-  var REMOTE_SYNC = 'https://107-175-122-81.sslip.io/transword-sync/vocab';
-  var syncTimer = null, syncBusy = false, syncBooting = false;
+  var SYNC_BASE = 'https://107-175-122-81.sslip.io/transword-sync';
+  var syncTimer = null, syncBusy = false;
 
   // 词典数据：完整版在本地/后台离线缓存中可用；公网首访按需加载分片。
   var DICT = (typeof OXFORD_DICT !== 'undefined') ? OXFORD_DICT : {};
@@ -535,38 +536,64 @@
     return lang + '|' + String(src == null ? '' : src).toLowerCase();
   }
 
-  function randomSyncCode() {
-    var bytes = new Uint8Array(18);
-    if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
-    else for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
-    return Array.prototype.map.call(bytes, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  // ========== 生词本账号同步（登录后跨设备自动合并） ==========
+  function syncToken() {
+    try { return localStorage.getItem(LS_TOKEN) || ''; } catch (e) { return ''; }
   }
-  function getSyncCode() {
-    var code = localStorage.getItem(LS_SYNC_CODE);
-    if (!code || !/^[a-f0-9]{36}$/.test(code)) { code = randomSyncCode(); localStorage.setItem(LS_SYNC_CODE, code); }
-    return code;
+  function setSyncUser(name, token) {
+    try {
+      if (name && token) {
+        localStorage.setItem(LS_USER, name);
+        localStorage.setItem(LS_TOKEN, token);
+      } else {
+        localStorage.removeItem(LS_USER);
+        localStorage.removeItem(LS_TOKEN);
+      }
+    } catch (e) {}
+    renderSyncBox();
   }
-  function showSyncCode() {
-    var label = $('sync-code-label');
-    if (label) label.textContent = '同步码：' + getSyncCode() + '（在其他设备输入此码）';
+  function renderSyncBox() {
+    var login = $('sync-login'), info = $('sync-info');
+    if (!login || !info) return;
+    var name = '';
+    try { name = localStorage.getItem(LS_USER) || ''; } catch (e) {}
+    if (name && syncToken()) {
+      login.classList.add('hidden');
+      info.classList.remove('hidden');
+      $('sync-user-label').textContent = '已登录：' + name;
+    } else {
+      login.classList.remove('hidden');
+      info.classList.add('hidden');
+    }
   }
-  function syncSetStatus(text, kind) {
-    var el = $('sync-status');
-    if (!el) return;
-    el.textContent = text;
-    el.className = 'sync-status' + (kind ? ' ' + kind : '');
-    el.classList.remove('hidden');
-  }
-  function syncFetch(method, body) {
-    var opts = { method: method, headers: { 'X-Transword-Code': getSyncCode() } };
+  function syncApi(path, method, body, withAuth) {
+    var opts = { method: method || 'GET', headers: {} };
     if (body !== undefined) {
       opts.headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify({ vocab: body });
+      opts.body = JSON.stringify(body);
     }
-    return fetch(REMOTE_SYNC, opts).then(function (r) {
-      if (!r.ok) throw new Error('sync-' + r.status);
-      return r.json();
+    var token = syncToken();
+    if (withAuth !== false && token) opts.headers['Authorization'] = 'Bearer ' + token;
+    return fetch(SYNC_BASE + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) {
+          var err = new Error((j && j.error) || ('http-' + r.status));
+          err.status = r.status;
+          throw err;
+        }
+        return j;
+      });
     });
+  }
+  function syncErrText(e, action) {
+    var map = {
+      'bad-credentials': '用户名或密码错误',
+      'username-taken': '这个用户名已被注册',
+      'invalid-username': '用户名需 3-20 位字母或数字',
+      'invalid-password': '密码至少 6 位',
+      'too-many-requests': '尝试太频繁，请一分钟后再试'
+    };
+    return map[e && e.message] || (action + '失败，请稍后再试');
   }
   function vocabMerge(a, b) {
     var map = {};
@@ -586,18 +613,33 @@
     try { return location && /demoncplus\.github\.io$/.test(location.hostname); }
     catch (e) { return false; }
   }
+  function syncSetStatus(text, kind) {
+    var el = $('sync-status');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'sync-status' + (kind ? ' ' + kind : '');
+    el.classList.remove('hidden');
+  }
   function syncVocab(reason) {
     if (!isOnlinePage() || syncBusy || !navigator.onLine) return;
+    if (!syncToken()) return; // 未登录不请求远程同步
     syncBusy = true;
     syncSetStatus('生词本同步中…', 'loading');
-    syncFetch('GET').then(function (remote) {
-      var merged = vocabMerge(vocab, remote.vocab || []);
+    syncApi('/vocab').then(function (remote) {
+      var merged = vocabMerge(vocab, (remote && remote.vocab) || []);
       vocab = merged; save(LS_VOCAB, vocab); renderVocab();
-      return syncFetch('PUT', merged);
+      return syncApi('/vocab', 'PUT', { vocab: merged });
     }).then(function () {
-      syncSetStatus('✓ 生词本已自动同步', 'ready');
-    }).catch(function () {
-      syncSetStatus('生词本同步稍后自动重试', 'warn');
+      var name = '';
+      try { name = localStorage.getItem(LS_USER) || ''; } catch (e) {}
+      syncSetStatus('✓ 生词本已同步' + (name ? '（' + name + '）' : ''), 'ready');
+    }).catch(function (e) {
+      if (e && e.status === 401) {
+        setSyncUser(null, null);
+        syncSetStatus('登录已过期，请重新登录', 'warn');
+      } else {
+        syncSetStatus('生词本同步稍后自动重试', 'warn');
+      }
     }).then(function () { syncBusy = false; });
   }
   function scheduleSync() {
@@ -811,21 +853,55 @@
     URL.revokeObjectURL(a.href);
   };
 
-  $('btn-sync-code').onclick = function () {
-    var oldCode = getSyncCode();
-    var code = prompt('输入另一台设备显示的 36 位同步码；留空则保留当前同步码：', oldCode);
-    if (code === null || !code.trim()) { showSyncCode(); return; }
-    code = code.trim().toLowerCase();
-    if (!/^[a-f0-9]{36}$/.test(code)) { alert('同步码必须是 36 位十六进制字符'); return; }
-    localStorage.setItem(LS_SYNC_CODE, code);
-    showSyncCode();
-    syncVocab('pair');
-  };
-  showSyncCode();
+  function doLogin(username, password) {
+    syncApi('/login', 'POST', { username: username, password: password }, false)
+      .then(function (j) {
+        setSyncUser(j.username, j.token);
+        $('sync-pass').value = '';
+        syncVocab('login');
+      })
+      .catch(function (e) { alert(syncErrText(e, '登录')); });
+  }
+  function doRegister(username, password) {
+    syncApi('/register', 'POST', { username: username, password: password }, false)
+      .then(function (j) {
+        setSyncUser(j.username, j.token);
+        $('sync-pass').value = '';
+        syncVocab('register');
+      })
+      .catch(function (e) { alert(syncErrText(e, '注册')); });
+  }
 
-  // 页面打开即拉取远端生词本；之后每次查询/删除/清空自动合并并上传。
+  $('btn-sync-login').onclick = function () {
+    var u = ($('sync-user').value || '').trim();
+    var p = $('sync-pass').value || '';
+    if (!u || !p) { alert('请输入用户名和密码'); return; }
+    doLogin(u, p);
+  };
+  $('btn-sync-register').onclick = function () {
+    var u = ($('sync-user').value || '').trim();
+    var p = $('sync-pass').value || '';
+    if (!u || !p) { alert('请输入用户名和密码'); return; }
+    doRegister(u, p);
+  };
+  $('btn-sync-logout').onclick = function () {
+    // 先通知服务器废弃令牌，再本地清除；即使服务器调用失败也照常退出。
+    syncApi('/logout', 'POST').catch(function () {}).then(function () {
+      setSyncUser(null, null);
+      syncSetStatus('已退出登录，生词本保存在本机', 'warn');
+    });
+  };
+
+  renderSyncBox();
+  // 打开页面时若已登录：校验令牌有效后拉取远端生词本；无效则清除登录态。
   if (isOnlinePage()) {
-    setTimeout(function () { syncVocab('boot'); }, 700);
+    if (syncToken()) {
+      syncApi('/whoami').then(function (j) {
+        if (j && j.username) { setSyncUser(j.username, syncToken()); syncVocab('boot'); }
+      }).catch(function (e) {
+        if (e && e.status === 401) setSyncUser(null, null);
+      });
+    }
   }
 
   // ========== PWA ==========
@@ -853,7 +929,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v15').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v17').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

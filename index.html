@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#4a6cf7">
 <title>译词通 - 英汉翻译 · 自动生词本</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 </head>
@@ -62,8 +62,18 @@
       <button id="btn-clear-vocab" class="danger">清空</button>
     </div>
     <div class="sync-pairing">
-      <button id="btn-sync-code">设置同步码</button>
-      <span id="sync-code-label">首次使用会自动生成个人同步码</span>
+      <div id="sync-login">
+        <input id="sync-user" type="text" autocomplete="username" placeholder="用户名（3-20位字母数字）">
+        <input id="sync-pass" type="password" autocomplete="current-password" placeholder="密码（至少6位）">
+        <div class="sync-btns">
+          <button id="btn-sync-login" class="primary">登录</button>
+          <button id="btn-sync-register">注册</button>
+        </div>
+      </div>
+      <div id="sync-info" class="hidden">
+        <span id="sync-user-label"></span>
+        <button id="btn-sync-logout">退出登录</button>
+      </div>
     </div>
     <ul id="vocab-list" class="vocab-list"></ul>
     <p id="vocab-empty" class="empty">生词本还是空的，去翻译点什么吧～</p>
@@ -73,11 +83,11 @@
 <footer>
   <div id="offline-status" class="offline-status hidden"></div>
   <div id="sync-status" class="sync-status hidden"></div>
-  线上版自动使用高质量翻译引擎 · 生词本自动同步
-  <br>数据仅保存在你的同步空间 · 支持离线安装
+  线上版自动使用高质量翻译引擎 · 登录后生词本跨设备同步
+  <br>数据仅保存在你的账号空间 · 支持离线安装
 </footer>
 
-<script src="dict-loader.js?v=16"></script>
-<script src="app.js?v=16"></script>
+<script src="dict-loader.js?v=17"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

@@ -602,8 +602,8 @@
     var map = {
       'bad-credentials': '用户名或密码错误',
       'username-taken': '这个用户名已被注册',
-      'invalid-username': '用户名需 3-20 位字母或数字',
-      'invalid-password': '密码至少 6 位',
+      'invalid-username': '用户名需 4-20 位，字母开头，可含数字下划线',
+      'invalid-password': '密码需 8-20 位，且同时包含字母和数字',
       'too-many-requests': '尝试太频繁，请一分钟后再试'
     };
     return map[e && e.message] || (action + '失败，请稍后再试');
@@ -941,7 +941,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v19').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v20').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

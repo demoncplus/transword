@@ -38,11 +38,20 @@ MAX_ITEMS = 5000
 TOKEN_DAYS = 90
 LOCK = threading.Lock()
 
-USER_RE = re.compile(r"^[A-Za-z0-9_-]{3,20}$")
+USER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{3,19}$")
 CODE_RE = re.compile(r"^[a-f0-9]{36}$")
 RATE_LIMIT = {"login": 10, "register": 5}
 _hits = {}
 _hits_lock = threading.Lock()
+
+
+def valid_password(pw):
+    """京东风格：8-20 位，必须同时包含字母和数字，可含常见符号。"""
+    if not isinstance(pw, str) or not (8 <= len(pw) <= 20):
+        return False
+    if not re.search(r"[A-Za-z]", pw) or not re.search(r"\d", pw):
+        return False
+    return bool(re.fullmatch(r"[A-Za-z0-9!@#$%^&*._~\-]+", pw))
 
 
 def db():
@@ -221,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(username, str) or not USER_RE.fullmatch(username):
                 self._json(400, {"error": "invalid-username"})
                 return
-            if not isinstance(password, str) or not (6 <= len(password) <= 128):
+            if not valid_password(password):
                 self._json(400, {"error": "invalid-password"})
                 return
             with LOCK, db() as conn:

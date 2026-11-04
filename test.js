@@ -119,7 +119,7 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
         /X-Transword-Code/.test(APP_SRC) === false &&
         /Authorization/.test(APP_SRC) && /Bearer/.test(APP_SRC) &&
         !/transword-public-v1/.test(APP_SRC));
-  check('生词本页面有登录/注册入口',
+  check('主页有登录/注册入口（翻译页顶部可见）',
         /btn-sync-login/.test(html) && /btn-sync-register/.test(html) && /btn-sync-logout/.test(html));
   check('登录输入框字号 >=16px（iOS 防放大）', /#sync-login input[^{]*\{[^}]*font-size:\s*16px/s.test(require('fs').readFileSync('style.css','utf8')));
   // 用"连不上的地址"模拟自建引擎未启动：用例1-6走免费接口/离线词典路径，

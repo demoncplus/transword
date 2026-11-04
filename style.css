@@ -116,7 +116,8 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 14px
 .sync-status.ready { color: #2ba84a; }
 .sync-status.loading { color: var(--primary); }
 .sync-status.warn { color: #c8891a; }
-.sync-pairing { margin: -4px 0 12px; }
+.sync-pairing { margin: 0 0 14px; padding: 10px; background: #eef1fb; border-radius: 12px; }
+.sync-pairing .sync-hint { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 #sync-login { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 #sync-login input {
   /* 字号 >=16px：iOS Safari 聚焦自动放大的坑 */
@@ -139,4 +140,5 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 14px
   .chip { background: #2c3245; }
   .vocab-list .zh { color: #b9bfcf; }
   .result-dict { color: #b9bfcf; }
+  .sync-pairing { background: #232837; }
 }

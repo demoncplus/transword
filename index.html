@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#4a6cf7">
 <title>译词通 - 英汉翻译 · 自动生词本</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 </head>
@@ -26,6 +26,21 @@
 <main>
   <!-- 翻译页 -->
   <section id="page-translate" class="page active">
+    <div class="sync-pairing">
+      <span class="sync-hint">登录后生词本跨设备自动同步（首次点「注册」创建账号）</span>
+      <div id="sync-login">
+        <input id="sync-user" type="text" autocomplete="username" placeholder="用户名（3-20位字母数字）">
+        <input id="sync-pass" type="password" autocomplete="current-password" placeholder="密码（至少6位）">
+        <div class="sync-btns">
+          <button id="btn-sync-login" class="primary">登录</button>
+          <button id="btn-sync-register">注册</button>
+        </div>
+      </div>
+      <div id="sync-info" class="hidden">
+        <span id="sync-user-label"></span>
+        <button id="btn-sync-logout">退出登录</button>
+      </div>
+    </div>
     <div class="lang-switch">
       <button id="lang-en2zh" class="lang-btn active">英 → 汉</button>
       <button id="lang-zh2en" class="lang-btn">汉 → 英</button>
@@ -61,20 +76,6 @@
       <button id="btn-export">导出</button>
       <button id="btn-clear-vocab" class="danger">清空</button>
     </div>
-    <div class="sync-pairing">
-      <div id="sync-login">
-        <input id="sync-user" type="text" autocomplete="username" placeholder="用户名（3-20位字母数字）">
-        <input id="sync-pass" type="password" autocomplete="current-password" placeholder="密码（至少6位）">
-        <div class="sync-btns">
-          <button id="btn-sync-login" class="primary">登录</button>
-          <button id="btn-sync-register">注册</button>
-        </div>
-      </div>
-      <div id="sync-info" class="hidden">
-        <span id="sync-user-label"></span>
-        <button id="btn-sync-logout">退出登录</button>
-      </div>
-    </div>
     <ul id="vocab-list" class="vocab-list"></ul>
     <p id="vocab-empty" class="empty">生词本还是空的，去翻译点什么吧～</p>
   </section>
@@ -87,7 +88,7 @@
   <br>数据仅保存在你的账号空间 · 支持离线安装
 </footer>
 
-<script src="dict-loader.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="dict-loader.js?v=19"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

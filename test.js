@@ -111,6 +111,10 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('已移除底部版本信息/清缓存按钮',
         !/id="build-info"/.test(html) && !/id="btn-reset-cache"/.test(html));
   check('默认翻译顺序提示仍在', /自建引擎/.test(html));
+  check('线上版声明自动同步生词本', /生词本自动同步/.test(html));
+  check('同步状态元素存在', /id="sync-status"/.test(html));
+  check('线上引擎地址已配置', /transword-engine\/translate/.test(APP_SRC));
+  check('同步接口已配置', /transword-sync\/vocab/.test(APP_SRC));
   // 用"连不上的地址"模拟自建引擎未启动：用例1-6走免费接口/离线词典路径，
   // 结果不依赖本机 8766 引擎是否在跑
   store['tw_api'] = 'http://127.0.0.1:18768/translate';

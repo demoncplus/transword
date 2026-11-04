@@ -112,6 +112,10 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 14px
 .offline-status.loading { color: var(--primary); }
 .offline-status.ready { color: #2ba84a; }
 .offline-status.warn { color: #c8891a; }
+.sync-status { font-size: 12px; margin-bottom: 6px; }
+.sync-status.ready { color: #2ba84a; }
+.sync-status.loading { color: var(--primary); }
+.sync-status.warn { color: #c8891a; }
 
 @media (prefers-color-scheme: dark) {
   :root { --bg: #14161d; --card: #1e222e; --text: #e8eaf2; --muted: #7c8398; }

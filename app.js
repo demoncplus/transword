@@ -10,6 +10,12 @@
   var LS_HISTORY = 'tw_history';
   var LS_LANG = 'tw_lang'; // 当前翻译方向
   var LS_API = 'tw_api';   // 自建翻译接口地址
+  var LS_SYNC_DEVICE = 'tw_sync_device';
+  // 公开项目不保存服务器私钥；此标识只用于限制误写入，不是机密。
+  var SYNC_KEY = 'transword-public-v1';
+  var REMOTE_ENGINE = 'https://107-175-122-81.sslip.io/transword-engine/translate';
+  var REMOTE_SYNC = 'https://107-175-122-81.sslip.io/transword-sync/vocab';
+  var syncTimer = null, syncBusy = false, syncBooting = false;
 
   // 词典数据：完整版在本地/后台离线缓存中可用；公网首访按需加载分片。
   var DICT = (typeof OXFORD_DICT !== 'undefined') ? OXFORD_DICT : {};
@@ -172,10 +178,12 @@
     } catch (e) { return ''; }
   }
   function defaultApiUrl() {
-    // 有服务器时一律走同源代理：http/https 都成立，也不会被混合内容策略拦
+    // GitHub Pages 线上版直接使用隔离 VPS 引擎；本地/局域网仍保留原有同源代理。
+    try {
+      if (location && /demoncplus\.github\.io$/.test(location.hostname)) return REMOTE_ENGINE;
+    } catch (e) {}
     var same = sameOriginEngine();
     if (same) return same;
-    // file:// 直接打开：只能直连本机引擎
     return 'http://localhost:' + API_PORT + '/translate';
   }
   function getApiUrl() {
@@ -529,6 +537,61 @@
     return lang + '|' + String(src == null ? '' : src).toLowerCase();
   }
 
+  function syncSetStatus(text, kind) {
+    var el = $('sync-status');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'sync-status' + (kind ? ' ' + kind : '');
+    el.classList.remove('hidden');
+  }
+  function syncFetch(method, body) {
+    var opts = { method: method, headers: { 'X-Transword-Key': SYNC_KEY } };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify({ vocab: body });
+    }
+    return fetch(REMOTE_SYNC, opts).then(function (r) {
+      if (!r.ok) throw new Error('sync-' + r.status);
+      return r.json();
+    });
+  }
+  function vocabMerge(a, b) {
+    var map = {};
+    (sanitizeVocab(a).concat(sanitizeVocab(b))).forEach(function (x) {
+      var k = vocabKey(x.src, x.lang), old = map[k];
+      if (!old) { map[k] = x; return; }
+      if ((x.dst && (!old.dst || x.flag === '' || old.flag === 'pending')) ||
+          (x.flag === '' && old.flag !== '')) old.dst = x.dst;
+      if (x.flag === '' || (old.flag !== '' && x.flag !== 'pending')) old.flag = x.flag;
+      old.count = Math.max(old.count || 1, x.count || 1);
+      old.ts = Math.max(old.ts || 0, x.ts || 0);
+    });
+    return Object.keys(map).map(function (k) { return map[k]; })
+      .sort(function (x, y) { return (y.ts || 0) - (x.ts || 0); });
+  }
+  function isOnlinePage() {
+    try { return location && /demoncplus\.github\.io$/.test(location.hostname); }
+    catch (e) { return false; }
+  }
+  function syncVocab(reason) {
+    if (!isOnlinePage() || syncBusy || !navigator.onLine) return;
+    syncBusy = true;
+    syncSetStatus('生词本同步中…', 'loading');
+    syncFetch('GET').then(function (remote) {
+      var merged = vocabMerge(vocab, remote.vocab || []);
+      vocab = merged; save(LS_VOCAB, vocab); renderVocab();
+      return syncFetch('PUT', merged);
+    }).then(function () {
+      syncSetStatus('✓ 生词本已自动同步', 'ready');
+    }).catch(function () {
+      syncSetStatus('生词本同步稍后自动重试', 'warn');
+    }).then(function () { syncBusy = false; });
+  }
+  function scheduleSync() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(function () { syncVocab('change'); }, 1200);
+  }
+
   function addToVocab(src, dst, countIt, lang, flag) {
     lang = lang || currentLang;
     dst = String(dst == null ? '' : dst);
@@ -557,12 +620,14 @@
         vocab.unshift(item);
         save(LS_VOCAB, vocab);
         renderVocab();
+        scheduleSync();
         return;
       }
     }
     vocab.unshift({ src: src, dst: dst, lang: lang, ts: Date.now(), count: 1, flag: flag });
     save(LS_VOCAB, vocab);
     renderVocab();
+    scheduleSync();
   }
 
   function renderVocab() {
@@ -709,6 +774,7 @@
       vocab = [];
       save(LS_VOCAB, vocab);
       renderVocab();
+      scheduleSync();
     }
   };
 
@@ -731,6 +797,11 @@
     a.click();
     URL.revokeObjectURL(a.href);
   };
+
+  // 页面打开即拉取远端生词本；之后每次查询/删除/清空自动合并并上传。
+  if (isOnlinePage()) {
+    setTimeout(function () { syncVocab('boot'); }, 700);
+  }
 
   // ========== PWA ==========
   var offlineStatusEl = $('offline-status');
@@ -757,7 +828,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v13').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v15').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

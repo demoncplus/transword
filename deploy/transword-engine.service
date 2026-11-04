@@ -1,0 +1,22 @@
+[Unit]
+Description=Transword Argos Translation Engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=transword
+Group=transword
+WorkingDirectory=/opt/transword
+Environment=ARGOS_CHUNK_TYPE=MINISBD
+ExecStart=/opt/transword/venv/bin/python /opt/transword/translate-api.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/transword
+
+[Install]
+WantedBy=multi-user.target

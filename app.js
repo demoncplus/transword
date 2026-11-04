@@ -10,9 +10,7 @@
   var LS_HISTORY = 'tw_history';
   var LS_LANG = 'tw_lang'; // 当前翻译方向
   var LS_API = 'tw_api';   // 自建翻译接口地址
-  var LS_SYNC_DEVICE = 'tw_sync_device';
-  // 公开项目不保存服务器私钥；此标识只用于限制误写入，不是机密。
-  var SYNC_KEY = 'transword-public-v1';
+  var LS_SYNC_CODE = 'tw_sync_code';
   var REMOTE_ENGINE = 'https://107-175-122-81.sslip.io/transword-engine/translate';
   var REMOTE_SYNC = 'https://107-175-122-81.sslip.io/transword-sync/vocab';
   var syncTimer = null, syncBusy = false, syncBooting = false;
@@ -537,6 +535,21 @@
     return lang + '|' + String(src == null ? '' : src).toLowerCase();
   }
 
+  function randomSyncCode() {
+    var bytes = new Uint8Array(18);
+    if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
+    else for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    return Array.prototype.map.call(bytes, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  }
+  function getSyncCode() {
+    var code = localStorage.getItem(LS_SYNC_CODE);
+    if (!code || !/^[a-f0-9]{36}$/.test(code)) { code = randomSyncCode(); localStorage.setItem(LS_SYNC_CODE, code); }
+    return code;
+  }
+  function showSyncCode() {
+    var label = $('sync-code-label');
+    if (label) label.textContent = '同步码：' + getSyncCode() + '（在其他设备输入此码）';
+  }
   function syncSetStatus(text, kind) {
     var el = $('sync-status');
     if (!el) return;
@@ -545,7 +558,7 @@
     el.classList.remove('hidden');
   }
   function syncFetch(method, body) {
-    var opts = { method: method, headers: { 'X-Transword-Key': SYNC_KEY } };
+    var opts = { method: method, headers: { 'X-Transword-Code': getSyncCode() } };
     if (body !== undefined) {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify({ vocab: body });
@@ -797,6 +810,18 @@
     a.click();
     URL.revokeObjectURL(a.href);
   };
+
+  $('btn-sync-code').onclick = function () {
+    var oldCode = getSyncCode();
+    var code = prompt('输入另一台设备显示的 36 位同步码；留空则保留当前同步码：', oldCode);
+    if (code === null || !code.trim()) { showSyncCode(); return; }
+    code = code.trim().toLowerCase();
+    if (!/^[a-f0-9]{36}$/.test(code)) { alert('同步码必须是 36 位十六进制字符'); return; }
+    localStorage.setItem(LS_SYNC_CODE, code);
+    showSyncCode();
+    syncVocab('pair');
+  };
+  showSyncCode();
 
   // 页面打开即拉取远端生词本；之后每次查询/删除/清空自动合并并上传。
   if (isOnlinePage()) {

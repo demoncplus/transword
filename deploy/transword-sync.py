@@ -8,31 +8,40 @@
 import json
 import os
 import threading
+import hashlib
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("TRANSWORD_SYNC_PORT", "8787"))
-KEY = os.environ.get("TRANSWORD_SYNC_KEY", "")
-DATA = os.environ.get("TRANSWORD_SYNC_DATA", "/var/lib/transword-sync/vocab.json")
+DATA_DIR = os.environ.get("TRANSWORD_SYNC_DATA_DIR", "/var/lib/transword-sync")
 MAX_BYTES = 2 * 1024 * 1024
+CODE_RE = re.compile(r"^[a-f0-9]{36}$")
 LOCK = threading.Lock()
 
 
-def load_data():
+def data_path(code):
+    if not CODE_RE.fullmatch(code or ""):
+        return None
+    digest = hashlib.sha256(code.encode("ascii")).hexdigest()
+    return os.path.join(DATA_DIR, digest + ".json")
+
+
+def load_data(path):
     try:
-        with open(DATA, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             value = json.load(f)
         return value if isinstance(value, list) else []
     except (OSError, ValueError):
         return []
 
 
-def save_data(value):
-    os.makedirs(os.path.dirname(DATA), exist_ok=True)
-    tmp = DATA + ".tmp"
+def save_data(path, value):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(value, f, ensure_ascii=False, separators=(",", ":"))
-    os.replace(tmp, DATA)
+    os.replace(tmp, path)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -41,31 +50,32 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Transword-Key")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Transword-Code")
         self.send_header("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
 
-    def authorized(self):
-        supplied = self.headers.get("X-Transword-Key", "") or self.path.split("key=", 1)[-1].split("&", 1)[0]
-        return bool(KEY) and supplied == KEY
+    def sync_code(self):
+        return self.headers.get("X-Transword-Code", "")
 
     def do_OPTIONS(self):
         self.send_json(204, {})
 
     def do_GET(self):
-        if self.path.split("?", 1)[0] != "/vocab" or not self.authorized():
-            self.send_json(404 if self.path.split("?", 1)[0] != "/vocab" else 403, {"error": "forbidden"})
+        path = data_path(self.sync_code())
+        if self.path.split("?", 1)[0] != "/vocab" or path is None:
+            self.send_json(404 if self.path.split("?", 1)[0] != "/vocab" else 403, {"error": "invalid-sync-code"})
             return
         with LOCK:
-            value = load_data()
+            value = load_data(path)
         self.send_json(200, {"vocab": value})
 
     def do_PUT(self):
-        if self.path.split("?", 1)[0] != "/vocab" or not self.authorized():
-            self.send_json(404 if self.path.split("?", 1)[0] != "/vocab" else 403, {"error": "forbidden"})
+        path = data_path(self.sync_code())
+        if self.path.split("?", 1)[0] != "/vocab" or path is None:
+            self.send_json(404 if self.path.split("?", 1)[0] != "/vocab" else 403, {"error": "invalid-sync-code"})
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -78,7 +88,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(400, {"error": "vocab-array-required"})
                 return
             with LOCK:
-                save_data(value)
+                save_data(path, value)
             self.send_json(200, {"ok": True, "count": len(value)})
         except (ValueError, OSError):
             self.send_json(400, {"error": "invalid-json"})

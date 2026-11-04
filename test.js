@@ -115,6 +115,8 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('同步状态元素存在', /id="sync-status"/.test(html));
   check('线上引擎地址已配置', /transword-engine\/translate/.test(APP_SRC));
   check('同步接口已配置', /transword-sync\/vocab/.test(APP_SRC));
+  check('同步使用个人配对码而非公共密钥', /X-Transword-Code/.test(APP_SRC) && !/transword-public-v1/.test(APP_SRC));
+  check('生词本页面有设置同步码入口', /btn-sync-code/.test(html) && /sync-code-label/.test(html));
   // 用"连不上的地址"模拟自建引擎未启动：用例1-6走免费接口/离线词典路径，
   // 结果不依赖本机 8766 引擎是否在跑
   store['tw_api'] = 'http://127.0.0.1:18768/translate';

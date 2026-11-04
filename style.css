@@ -116,6 +116,9 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 14px
 .sync-status.ready { color: #2ba84a; }
 .sync-status.loading { color: var(--primary); }
 .sync-status.warn { color: #c8891a; }
+.sync-pairing { display: flex; align-items: center; gap: 8px; margin: -4px 0 12px; color: var(--muted); font-size: 12px; }
+.sync-pairing button { padding: 6px 10px; font-size: 13px; min-height: 34px; }
+#sync-code-label { min-width: 0; overflow-wrap: anywhere; }
 
 @media (prefers-color-scheme: dark) {
   :root { --bg: #14161d; --card: #1e222e; --text: #e8eaf2; --muted: #7c8398; }

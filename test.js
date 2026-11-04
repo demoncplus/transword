@@ -121,7 +121,19 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
         !/transword-public-v1/.test(APP_SRC));
   check('主页有登录/注册入口（翻译页顶部可见）',
         /btn-sync-login/.test(html) && /btn-sync-register/.test(html) && /btn-sync-logout/.test(html));
-  check('登录输入框字号 >=16px（iOS 防放大）', /#sync-login input[^{]*\{[^}]*font-size:\s*16px/s.test(require('fs').readFileSync('style.css','utf8')));
+  check('登录输入框字号 >=16px（iOS 防放大）', /\.sync-field input[^{]*\{[^}]*font-size:\s*16px/s.test(require('fs').readFileSync('style.css','utf8')));
+  check('有密码可见切换与内联错误提示元素',
+        /btn-toggle-pass/.test(html) && /sync-user-err/.test(html) && /sync-pass-err/.test(html) && /sync-hint/.test(html));
+  check('前端含用户名/密码实时校验逻辑', /validateUsername/.test(APP_SRC) && /validatePassword/.test(APP_SRC));
+
+  // 注册/登录错误必须在输入框下方内联提示，而不是只弹 alert
+  elements['sync-user'].value = 'ab';
+  elements['sync-pass'].value = '12345';
+  click('btn-sync-login');
+  check('非法用户名在输入框下方显示错误', /用户名/.test(elements['sync-user-err'].textContent || ''), elements['sync-user-err'].textContent);
+  check('非法密码在输入框下方显示错误', /密码/.test(elements['sync-pass-err'].textContent || ''), elements['sync-pass-err'].textContent);
+  elements['sync-user'].value = '';
+  elements['sync-pass'].value = '';
   // 用"连不上的地址"模拟自建引擎未启动：用例1-6走免费接口/离线词典路径，
   // 结果不依赖本机 8766 引擎是否在跑
   store['tw_api'] = 'http://127.0.0.1:18768/translate';

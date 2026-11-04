@@ -118,14 +118,25 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 14px
 .sync-status.warn { color: #c8891a; }
 .sync-pairing { margin: 0 0 14px; padding: 10px; background: #eef1fb; border-radius: 12px; }
 .sync-pairing .sync-hint { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-#sync-login { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-#sync-login input {
+#sync-login { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.sync-field { flex: 1 1 150px; min-width: 0; }
+.sync-field input {
   /* 字号 >=16px：iOS Safari 聚焦自动放大的坑 */
-  flex: 1 1 140px; min-width: 0; border: 1.5px solid #dfe4f2; border-radius: 10px;
+  width: 100%; box-sizing: border-box; border: 1.5px solid #dfe4f2; border-radius: 10px;
   padding: 8px 10px; font-size: 16px; outline: none; background: var(--card); color: var(--text);
 }
-#sync-login input:focus { border-color: var(--primary); }
-.sync-btns { display: flex; gap: 8px; }
+.sync-field input:focus { border-color: var(--primary); }
+.sync-field input.invalid { border-color: var(--danger); }
+.field-rule { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.field-err { display: block; font-size: 12px; color: var(--danger); margin-top: 2px; min-height: 16px; }
+.sync-pass-wrap { position: relative; }
+.sync-pass-wrap input { padding-right: 38px; }
+.pass-toggle {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  border: none; background: transparent; font-size: 17px; padding: 4px 8px; min-height: 0;
+  cursor: pointer; color: var(--muted); line-height: 1;
+}
+.sync-btns { display: flex; gap: 8px; align-self: center; }
 #sync-info { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
 #sync-user-label { min-width: 0; overflow-wrap: anywhere; }
 

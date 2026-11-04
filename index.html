@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#4a6cf7">
 <title>译词通 - 英汉翻译 · 自动生词本</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 </head>
@@ -27,10 +27,21 @@
   <!-- 翻译页 -->
   <section id="page-translate" class="page active">
     <div class="sync-pairing">
-      <span class="sync-hint">登录后生词本跨设备自动同步（首次点「注册」创建账号）</span>
+      <span class="sync-hint" id="sync-hint">登录后生词本跨设备自动同步（首次点「注册」创建账号）</span>
       <div id="sync-login">
-        <input id="sync-user" type="text" autocomplete="username" placeholder="用户名（4-20位，字母开头）">
-        <input id="sync-pass" type="password" autocomplete="current-password" placeholder="密码（8-20位，含字母和数字）">
+        <div class="sync-field">
+          <input id="sync-user" type="text" autocomplete="username" placeholder="用户名">
+          <span class="field-rule">4-20 位，字母开头，可含数字下划线</span>
+          <span class="field-err" id="sync-user-err"></span>
+        </div>
+        <div class="sync-field">
+          <div class="sync-pass-wrap">
+            <input id="sync-pass" type="password" autocomplete="current-password" placeholder="密码">
+            <button id="btn-toggle-pass" type="button" class="pass-toggle" title="显示/隐藏密码">👁</button>
+          </div>
+          <span class="field-rule">8-20 位，需含字母和数字</span>
+          <span class="field-err" id="sync-pass-err"></span>
+        </div>
         <div class="sync-btns">
           <button id="btn-sync-login" class="primary">登录</button>
           <button id="btn-sync-register">注册</button>
@@ -88,7 +99,7 @@
   <br>数据仅保存在你的账号空间 · 支持离线安装
 </footer>
 
-<script src="dict-loader.js?v=20"></script>
-<script src="app.js?v=20"></script>
+<script src="dict-loader.js?v=21"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>

@@ -562,17 +562,19 @@
     renderSyncBox();
   }
   function renderSyncBox() {
-    var login = $('sync-login'), info = $('sync-info');
+    var login = $('sync-login'), info = $('sync-info'), hint = $('sync-hint');
     if (!login || !info) return;
     var name = '';
     try { name = localStorage.getItem(LS_USER) || ''; } catch (e) {}
     if (name && syncToken()) {
       login.classList.add('hidden');
       info.classList.remove('hidden');
+      if (hint) hint.classList.add('hidden');
       $('sync-user-label').textContent = '已登录：' + name;
     } else {
       login.classList.remove('hidden');
       info.classList.add('hidden');
+      if (hint) hint.classList.remove('hidden');
     }
   }
   function syncBaseUrl() {
@@ -865,43 +867,99 @@
     URL.revokeObjectURL(a.href);
   };
 
+  function validateUsername(u) {
+    if (!u) return '请输入用户名';
+    if (!/^[A-Za-z][A-Za-z0-9_]{3,19}$/.test(u)) return '用户名需 4-20 位，字母开头，可含数字下划线';
+    return '';
+  }
+  function validatePassword(p) {
+    if (!p) return '请输入密码';
+    if (p.length < 8 || p.length > 20) return '密码需 8-20 位';
+    if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) return '密码需同时包含字母和数字';
+    return '';
+  }
+  function showFieldErr(inputId, errId, msg) {
+    var input = $(inputId), err = $(errId);
+    if (input) input.classList.toggle('invalid', !!msg);
+    if (err) err.textContent = msg || '';
+  }
+  function clearSyncErrors() {
+    showFieldErr('sync-user', 'sync-user-err', '');
+    showFieldErr('sync-pass', 'sync-pass-err', '');
+  }
   function doLogin(username, password) {
     syncApi('/login', 'POST', { username: username, password: password }, false)
       .then(function (j) {
         setSyncUser(j.username, j.token);
         $('sync-pass').value = '';
+        clearSyncErrors();
         syncVocab('login');
       })
-      .catch(function (e) { alert(syncErrText(e, '登录')); });
+      .catch(function (e) {
+        if (e && e.message === 'bad-credentials') {
+          showFieldErr('sync-pass', 'sync-pass-err', '用户名或密码错误');
+        } else {
+          showFieldErr('sync-user', 'sync-user-err', syncErrText(e, '登录'));
+        }
+      });
   }
   function doRegister(username, password) {
     syncApi('/register', 'POST', { username: username, password: password }, false)
       .then(function (j) {
         setSyncUser(j.username, j.token);
         $('sync-pass').value = '';
+        clearSyncErrors();
         syncVocab('register');
       })
-      .catch(function (e) { alert(syncErrText(e, '注册')); });
+      .catch(function (e) {
+        if (e && e.message === 'username-taken') {
+          showFieldErr('sync-user', 'sync-user-err', '这个用户名已被注册');
+        } else if (e && e.message === 'invalid-username') {
+          showFieldErr('sync-user', 'sync-user-err', '用户名需 4-20 位，字母开头，可含数字下划线');
+        } else if (e && e.message === 'invalid-password') {
+          showFieldErr('sync-pass', 'sync-pass-err', '密码需 8-20 位，且同时包含字母和数字');
+        } else {
+          showFieldErr('sync-user', 'sync-user-err', syncErrText(e, '注册'));
+        }
+      });
+  }
+  function submitSync(action) {
+    var u = ($('sync-user').value || '').trim();
+    var p = $('sync-pass').value || '';
+    var ue = validateUsername(u), pe = validatePassword(p);
+    showFieldErr('sync-user', 'sync-user-err', ue);
+    showFieldErr('sync-pass', 'sync-pass-err', pe);
+    if (ue || pe) return;
+    if (action === 'login') doLogin(u, p); else doRegister(u, p);
   }
 
-  $('btn-sync-login').onclick = function () {
-    var u = ($('sync-user').value || '').trim();
-    var p = $('sync-pass').value || '';
-    if (!u || !p) { alert('请输入用户名和密码'); return; }
-    doLogin(u, p);
-  };
-  $('btn-sync-register').onclick = function () {
-    var u = ($('sync-user').value || '').trim();
-    var p = $('sync-pass').value || '';
-    if (!u || !p) { alert('请输入用户名和密码'); return; }
-    doRegister(u, p);
-  };
+  $('btn-sync-login').onclick = function () { submitSync('login'); };
+  $('btn-sync-register').onclick = function () { submitSync('register'); };
   $('btn-sync-logout').onclick = function () {
     // 先通知服务器废弃令牌，再本地清除；即使服务器调用失败也照常退出。
     syncApi('/logout', 'POST').catch(function () {}).then(function () {
       setSyncUser(null, null);
       syncSetStatus('已退出登录，生词本保存在本机', 'warn');
     });
+  };
+
+  // 实时校验：输入时即时提示/清除错误
+  $('sync-user').addEventListener('input', function () {
+    var u = ($('sync-user').value || '').trim();
+    showFieldErr('sync-user', 'sync-user-err', u ? validateUsername(u) : '');
+  });
+  $('sync-pass').addEventListener('input', function () {
+    var p = $('sync-pass').value || '';
+    showFieldErr('sync-pass', 'sync-pass-err', p ? validatePassword(p) : '');
+  });
+  // 密码框按回车直接登录
+  $('sync-pass').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); submitSync('login'); }
+  });
+  // 密码可见切换
+  $('btn-toggle-pass').onclick = function () {
+    var inp = $('sync-pass');
+    inp.type = (inp.type === 'password') ? 'text' : 'password';
   };
 
   renderSyncBox();
@@ -941,7 +999,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v20').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v21').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

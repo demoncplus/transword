@@ -147,6 +147,10 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   const immediate = elements['result-text'].textContent;
   check('点击后立即有离线结果', immediate.length > 0 && immediate !== '翻译中…', immediate);
   check('提示正在尝试翻译源', /正在尝试更准确的翻译源/.test(elements['result-dict'].innerHTML));
+  // 单词必须显示完整多义，不能只取第一个义项（用户反馈"只给一个意思不实用"）
+  check('单词返回完整多义（源码不截断首义项）',
+        /return \{ text: DICT\[lower\], exact: true \}/.test(APP_SRC) &&
+        /return \{ text: CN_DICT\[text\], exact: true, missing: 0 \}/.test(APP_SRC));
 
   console.log('== 2. 英译汉：联网精翻覆盖 ==');
   // MyMemory 偶发慢：固定 sleep 5 秒会在网络抖动时误报失败。
@@ -182,7 +186,7 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   await sleep(1500);
   const offline = elements['result-text'].textContent;
   check('断网仍有离线词典结果', /漂亮|美丽|美好/.test(offline), offline);
-  check('标注离线兜底', /离线词典翻译（自建\/免费接口均不可用/.test(elements['result-dict'].innerHTML), elements['result-dict'].innerHTML);
+  check('断网查词标注离线词典', /离线词典/.test(elements['result-dict'].innerHTML), elements['result-dict'].innerHTML);
 
   console.log('== 4b. 汉译英模式下输入英文 → 自动走英汉词典 ==');
   click('lang-zh2en');

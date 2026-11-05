@@ -29,10 +29,9 @@
     var lower = text.toLowerCase().trim();
     if (!lower) return null;
     
-    // 先尝试完整匹配（单词/词条取第一个义项，避免"学习，研究，学科…"长释义跳变）
+    // 先尝试完整匹配（返回完整释义，多义词保留所有意思）
     if (DICT[lower]) {
-      var firstSense = String(DICT[lower]).split(/[，,；;]/)[0].trim();
-      return { text: firstSense, exact: true };
+      return { text: DICT[lower], exact: true };
     }
     // 句子逐词翻译
     return { text: translateSentenceEn2Zh(lower), exact: false };
@@ -96,10 +95,9 @@
       return translateEn2Zh(text);
     }
 
-    // 先尝试完整匹配（取第一个候选，避免"ready;spare;auxiliary"多候选跳变）
+    // 先尝试完整匹配（返回完整候选，如"ready;spare;auxiliary"保留所有意思）
     if (CN_DICT[text]) {
-      var firstCand = String(CN_DICT[text]).split(';')[0].trim();
-      return { text: firstCand, exact: true, missing: 0 };
+      return { text: CN_DICT[text], exact: true, missing: 0 };
     }
     // 逐词匹配；缺字时结果不完整，命中多词时只是逐字直译（词序不可靠）
     var r = translateSentenceZh2En(text);
@@ -486,6 +484,19 @@
       savedTip.classList.remove('hidden');
     }
     addHistory(text);
+
+    // 单词/词条精确命中时，离线词典已给出完整多义，直接返回，不再请求引擎。
+    // 避免"先显示完整释义、再被引擎覆盖成单义"的跳变，同时保留多义词的全部意思。
+    // 短语和整句仍走引擎精翻。
+    var trimmed = text.trim();
+    var isDictEntry = effLang === 'en2zh'
+      ? /^[a-z][a-z'-]*$/.test(trimmed.toLowerCase())
+      : /^[\u4e00-\u9fff]{1,6}$/.test(trimmed);
+    if (res.exact && !incomplete && isDictEntry) {
+      resultDict.innerHTML = '<div style="color:#888;font-size:13px;">⚡ 离线词典' +
+        (flipped ? '（检测到输入为英文，已按英→汉处理）' : '') + '</div>';
+      return;
+    }
 
     // 第二步：三级翻译链 自建接口 → 免费接口，成功则覆盖为更准确的句子翻译
     var langpair = effLang === 'zh2en' ? 'zh-CN|en' : 'en|zh-CN';
@@ -1027,7 +1038,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v25').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v26').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

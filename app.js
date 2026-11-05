@@ -335,7 +335,7 @@
       var count = (typeof it.count === 'number' && it.count > 0) ? Math.floor(it.count) : 1;
       // flag: '' 正常译文 | 'literal' 逐词直译（仅供参考）| 'pending' 暂未收录译文
       var flag = (it.flag === 'literal' || it.flag === 'pending') ? it.flag : '';
-      out.push({ src: src, dst: dst, lang: lang, ts: ts, count: count, flag: flag });
+      out.push({ src: src, dst: dst, lang: lang, ts: ts, count: count, flag: flag, deleted: !!it.deleted });
     });
     return out;
   }
@@ -617,11 +617,19 @@
     (sanitizeVocab(a).concat(sanitizeVocab(b))).forEach(function (x) {
       var k = vocabKey(x.src, x.lang), old = map[k];
       if (!old) { map[k] = x; return; }
-      if ((x.dst && (!old.dst || x.flag === '' || old.flag === 'pending')) ||
-          (x.flag === '' && old.flag !== '')) old.dst = x.dst;
-      if (x.flag === '' || (old.flag !== '' && x.flag !== 'pending')) old.flag = x.flag;
+      // ts 更新的一方胜出（deleted 作为版本属性随 ts 传播）
+      if ((x.ts || 0) > (old.ts || 0)) {
+        map[k] = x;
+        return;
+      }
+      // old 更新或相同：保留 old，但合并字段（删除标记传播 + 译文提升）
+      if (x.deleted) old.deleted = true;
+      if (!old.deleted) {
+        if ((x.dst && (!old.dst || x.flag === '' || old.flag === 'pending')) ||
+            (x.flag === '' && old.flag !== '')) old.dst = x.dst;
+        if (x.flag === '' || (old.flag !== '' && x.flag !== 'pending')) old.flag = x.flag;
+      }
       old.count = Math.max(old.count || 1, x.count || 1);
-      old.ts = Math.max(old.ts || 0, x.ts || 0);
     });
     return Object.keys(map).map(function (k) { return map[k]; })
       .sort(function (x, y) { return (y.ts || 0) - (x.ts || 0); });
@@ -693,6 +701,7 @@
         else if (!old && dst) { item.dst = dst; item.flag = flag; }
         item.ts = Date.now();
         item.lang = lang;
+        item.deleted = false;  // 重新查询复活（清除之前的删除标记）
         if (countIt !== false) item.count = (item.count || 1) + 1;
         vocab.splice(i, 1);
         vocab.unshift(item);
@@ -715,6 +724,8 @@
     var shown = 0;
 
     vocab.forEach(function (item, idx) {
+      // 跳过已删除（tombstone）条目：它们只用于同步传播删除，不显示
+      if (item.deleted) return;
       // 防御式取值：万一还有漏网的脏数据，也不能让整页渲染崩掉
       var src = String(item.src == null ? '' : item.src);
       var dst = String(item.dst == null ? '' : item.dst);
@@ -751,9 +762,12 @@
       delBtn.textContent = '删除';
       delBtn.className = 'danger';
       delBtn.onclick = function () {
-        vocab.splice(idx, 1);
+        // 标记删除（tombstone）而非真正移除，让"删除"能通过同步传播到其他设备
+        item.deleted = true;
+        item.ts = Date.now();
         save(LS_VOCAB, vocab);
         renderVocab();
+        scheduleSync();
       };
       ops.appendChild(speakBtn);
       ops.appendChild(delBtn);
@@ -767,17 +781,18 @@
     //   生词本真的为空 vs 只是被搜索框过滤掉了
     // 原来一律显示"生词本还是空的，去翻译点什么吧～"，
     // 搜索框里残留过滤词时，刚搜的词明明已入库却看到"还是空的"，用户会以为没添加成功。
+    var activeCount = vocab.filter(function (v) { return !v.deleted; }).length;
     var emptyEl = $('vocab-empty');
     if (shown) {
       emptyEl.style.display = 'none';
-    } else if (q && vocab.length) {
-      emptyEl.textContent = '生词本里有 ' + vocab.length + ' 个词，但没有匹配「' + q + '」的（清空上方搜索框可看全部）';
+    } else if (q && activeCount) {
+      emptyEl.textContent = '生词本里有 ' + activeCount + ' 个词，但没有匹配「' + q + '」的（清空上方搜索框可看全部）';
       emptyEl.style.display = 'block';
     } else {
       emptyEl.textContent = '生词本还是空的，去翻译点什么吧～';
       emptyEl.style.display = 'block';
     }
-    $('vocab-count').textContent = vocab.length;
+    $('vocab-count').textContent = activeCount;
   }
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -847,9 +862,12 @@
   $('vocab-search').addEventListener('input', renderVocab);
 
   $('btn-clear-vocab').onclick = function () {
-    if (!vocab.length) return;
+    var active = vocab.filter(function (v) { return !v.deleted; });
+    if (!active.length) return;
     if (confirm('确定清空整个生词本吗？此操作不可恢复。')) {
-      vocab = [];
+      // 全部标记删除（tombstone），让"清空"能同步到其他设备
+      var now = Date.now();
+      vocab.forEach(function (v) { v.deleted = true; v.ts = now; });
       save(LS_VOCAB, vocab);
       renderVocab();
       scheduleSync();
@@ -857,9 +875,10 @@
   };
 
   $('btn-export').onclick = function () {
-    if (!vocab.length) { alert('生词本为空'); return; }
+    var active = vocab.filter(function (v) { return !v.deleted; });
+    if (!active.length) { alert('生词本为空'); return; }
     var lines = ['原文\t译文\t方向\t查询次数\t时间\t备注'];
-    vocab.forEach(function (v) {
+    active.forEach(function (v) {
       var dir = v.lang === 'zh2en' ? '汉→英' : '英→汉';
       var dst = String(v.dst == null ? '' : v.dst).replace(/[\t\r\n]+/g, ' ');
       // 备注列如实反映可靠性，避免导出的表格里把"逐词直译"当成准确译文
@@ -1008,7 +1027,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v24').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v25').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

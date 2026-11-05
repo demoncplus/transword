@@ -125,6 +125,9 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('有密码可见切换与内联错误提示元素',
         /btn-toggle-pass/.test(html) && /sync-user-err/.test(html) && /sync-pass-err/.test(html) && /sync-hint/.test(html));
   check('前端含用户名/密码实时校验逻辑', /validateUsername/.test(APP_SRC) && /validatePassword/.test(APP_SRC));
+  check('.hidden 用 !important（否则被 id 选择器覆盖，登录框藏不住）',
+        /\.hidden\s*\{\s*display:\s*none\s*!important/.test(require('fs').readFileSync('style.css','utf8')));
+  check('联网后自动补同步（online 事件监听）', /addEventListener\(['"]online['"]/.test(APP_SRC));
 
   // 注册/登录错误必须在输入框下方内联提示，而不是只弹 alert
   elements['sync-user'].value = 'ab';

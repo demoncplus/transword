@@ -661,6 +661,13 @@
     syncTimer = setTimeout(function () { syncVocab('change'); }, 1200);
   }
 
+  // 断网期间本地改了生词本，联网后自动补同步（用户要求"联网自动更新内容"）
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('online', function () {
+      if (isOnlinePage() && syncToken()) syncVocab('online');
+    });
+  }
+
   function addToVocab(src, dst, countIt, lang, flag) {
     lang = lang || currentLang;
     dst = String(dst == null ? '' : dst);
@@ -999,7 +1006,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v21').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v22').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

@@ -221,7 +221,14 @@
     if (!t || typeof t !== 'string') return false;
     if (/^MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID/i.test(t)) return false;
     var hasCjk = /[\u4e00-\u9fff]/.test(t);
-    return wantCjk ? hasCjk : !hasCjk;
+    if (wantCjk) {
+      if (!hasCjk) return false;
+      // 拒绝中英混杂垃圾（如引擎把 chinese 错译成"中国语Name"）：
+      // 目标中文不应含连续 3 个及以上的英文字母（保留 iPhone 这类专名由短串通过）
+      if (/[a-zA-Z]{3,}/.test(t)) return false;
+      return true;
+    }
+    return !hasCjk;
   }
 
   // 自建接口：GET {endpoint}?text=..&langpair=en|zh-CN
@@ -1038,7 +1045,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v26').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v27').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

@@ -165,6 +165,47 @@ for k, v in manual.items():
     entries[k] = v
 print('  人工词条 %d 条已并入（覆盖机器结果 %d 条）' % (len(manual), overridden))
 
+# 中文整句短语（离线汉译英直接命中，避免逐词乱序）
+CN_PHRASES = {
+    '现在几点了': 'What time is it now',
+    '今天星期几': 'What day is it today',
+    '今天天气怎么样': 'How is the weather today',
+    '下雨了': 'It is raining',
+    '今天很冷': 'It is cold today',
+    '今天很热': 'It is hot today',
+    '我很开心': 'I am happy',
+    '我很难过': 'I am sad',
+    '我很生气': 'I am angry',
+    '我很担心': 'I am worried',
+    '我很累': 'I am very tired',
+    '我饿了': 'I am hungry',
+    '我渴了': 'I am thirsty',
+    '我喜欢': 'I like it',
+    '我爱你': 'I love you',
+    '我想你': 'I miss you',
+    '我想去': 'I want to go',
+    '我需要帮助': 'I need help',
+    '我有个问题': 'I have a question',
+    '我得走了': 'I have to go',
+    '等等我': 'Wait for me',
+    '跟我来': 'Follow me',
+    '你在做什么': 'What are you doing',
+    '你去哪里': 'Where are you going',
+    '你是谁': 'Who are you',
+    '我该怎么办': 'What should I do',
+    '请告诉我': 'Please tell me',
+    '请进': 'Please come in',
+    '请坐': 'Please sit down',
+    '开门': 'Open the door',
+    '关窗': 'Close the window',
+    '开灯': 'Turn on the light',
+    '非常感谢': 'Thank you very much',
+    '没问题': 'No problem',
+}
+for k, v in CN_PHRASES.items():
+    entries[k] = v
+print('  中文整句短语 %d 条已并入' % len(CN_PHRASES))
+
 print('  最终条目: %d' % len(entries))
 
 # 抽查

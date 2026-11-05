@@ -29,9 +29,10 @@
     var lower = text.toLowerCase().trim();
     if (!lower) return null;
     
-    // 先尝试完整匹配
+    // 先尝试完整匹配（单词/词条取第一个义项，避免"学习，研究，学科…"长释义跳变）
     if (DICT[lower]) {
-      return { text: DICT[lower], exact: true };
+      var firstSense = String(DICT[lower]).split(/[，,；;]/)[0].trim();
+      return { text: firstSense, exact: true };
     }
     // 句子逐词翻译
     return { text: translateSentenceEn2Zh(lower), exact: false };
@@ -95,9 +96,10 @@
       return translateEn2Zh(text);
     }
 
-    // 先尝试完整匹配
+    // 先尝试完整匹配（取第一个候选，避免"ready;spare;auxiliary"多候选跳变）
     if (CN_DICT[text]) {
-      return { text: CN_DICT[text], exact: true, missing: 0 };
+      var firstCand = String(CN_DICT[text]).split(';')[0].trim();
+      return { text: firstCand, exact: true, missing: 0 };
     }
     // 逐词匹配；缺字时结果不完整，命中多词时只是逐字直译（词序不可靠）
     var r = translateSentenceZh2En(text);
@@ -1006,7 +1008,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v23').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v24').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

@@ -117,6 +117,11 @@
   global.TW_DICT_LOADER = {
     prepare: function (text, lang) {
       if (loaded.full) return Promise.resolve();
+      // 离线时优先加载完整词典（SW 已预缓存），而不是按需分片——分片可能没被缓存，
+      // 导致"离线查不到词"（如 iPhone 离线查 display 查不到）。
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return loadFull();
+      }
       return lang === 'zh2en' && !/^[a-zA-Z][a-zA-Z0-9\s'.-]*$/.test(String(text || '').trim())
         ? prepareZh(text) : prepareEn(text);
     },

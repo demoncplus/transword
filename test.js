@@ -735,12 +735,15 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('13e 首屏不再同步下载完整词典',
         !/<script src="dict\.js/.test(htmlSrc) && !/<script src="cn-dict\.js/.test(htmlSrc) &&
         /<script src="dict-loader\.js/.test(htmlSrc));
-  check('13f Service Worker 首屏也不预下载完整词典',
-        !/ASSETS[\s\S]*?'\.\/dict\.js'/.test(fs.readFileSync('sw.js', 'utf8').split('self.addEventListener')[0]));
+  check('13f Service Worker 预缓存完整词典（保证离线查词可靠）',
+        /'\.\/dict\.js'/.test(fs.readFileSync('sw.js', 'utf8').split('self.addEventListener')[0]) &&
+        /'\.\/cn-dict\.js'/.test(fs.readFileSync('sw.js', 'utf8').split('self.addEventListener')[0]));
   check('13g 页面空闲后仍后台准备完整离线词典',
         /prepare-offline/.test(fs.readFileSync('app.js', 'utf8')) &&
         /dict\.js/.test(fs.readFileSync('sw.js', 'utf8')) &&
         /cn-dict\.js/.test(fs.readFileSync('sw.js', 'utf8')));
+  check('13h 离线时查词直接加载完整词典而非分片',
+        /navigator\.onLine === false[\s\S]{0,80}loadFull/.test(fs.readFileSync('dict-loader.js', 'utf8')));
 
   console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
   process.exit(fail ? 1 : 0);

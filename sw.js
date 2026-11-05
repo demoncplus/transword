@@ -4,7 +4,7 @@
  * 查 fun 会退化成 [fun]），而且连 sw.js 自己都换不掉。
  * 现在同源资源一律先走网络，拿不到（断网）才用缓存，既保证更新即时生效，又保持离线可用。
  */
-var CACHE = 'transword-v22';
+var CACHE = 'transword-v23';
 var ASSETS = [
   './',
   './index.html',
@@ -14,7 +14,10 @@ var ASSETS = [
   './manifest.json',
   './icon.svg',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  // 完整词典直接预缓存：保证离线查词 100% 可靠（不依赖"等 30 秒"）
+  './dict.js',
+  './cn-dict.js'
 ];
 
 self.addEventListener('install', function (e) {

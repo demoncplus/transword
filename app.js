@@ -523,16 +523,24 @@
 
     // 离线结果可靠吗？
     //   - 汉译英有汉字没收录 → 残句（如「备用」→「use」）不是译文
-    //   - 汉译英整句逐字直译 → 词序必然错的碎句（如「请问洗手间在哪里？」）
-    // 这两种不能作为正式译文展示，但**仍要记进生词本**（用户要求"搜过的都自动收录"），
-    // 只是打上标记，界面上如实标注，避免把不可靠结果当成准确译文。
+    //   - 汉译英/英译汉整句 → 逐词拼接词序必然错乱，不能当正式译文
+    // 这些不能作为正式译文展示（否则用户会先看到一段错误内容再被覆盖），
+    // 但**仍要记进生词本**（用户要求"搜过的都自动收录"），只是打标记。
+    var trimmed = text.trim();
+    var isDictEntry = effLang === 'en2zh'
+      ? /^[a-z][a-z'-]*$/.test(trimmed.toLowerCase())
+      : /^[\u4e00-\u9fff]{1,6}$/.test(trimmed);
     var wordByWord = effLang === 'zh2en' && !res.exact && (res.hits || 0) > 1;
-    var incomplete = !!res.missing || !res.text || wordByWord;
+    // 英译汉整句：非精确命中即逐词拼接，同样不算正式译文
+    var sentenceLevel = !isDictEntry && !res.exact;
+    var incomplete = !!res.missing || !res.text || wordByWord || sentenceLevel;
 
     if (incomplete) {
       resultText.textContent = '翻译中…';
       resultDict.innerHTML = '<div style="color:#888;font-size:13px;">⚡ ' +
-        (wordByWord ? '离线词典仅能逐词直译，正在请求引擎…' : '离线词典未收录，正在请求引擎…') + '</div>';
+        (sentenceLevel ? '正在翻译整句…'
+          : wordByWord ? '离线词典仅能逐词直译，正在请求引擎…'
+          : '离线词典未收录，正在请求引擎…') + '</div>';
       savedTip.classList.add('hidden');
       // 先以"待补译文"状态收录，保证搜索过的词一定进生词本；
       // 稍后引擎若返回好译文，下面的分支会把它升级为正式译文。
@@ -549,10 +557,6 @@
     // 单词/词条精确命中时，离线词典已给出完整多义，直接返回，不再请求引擎。
     // 避免"先显示完整释义、再被引擎覆盖成单义"的跳变，同时保留多义词的全部意思。
     // 短语和整句仍走引擎精翻。
-    var trimmed = text.trim();
-    var isDictEntry = effLang === 'en2zh'
-      ? /^[a-z][a-z'-]*$/.test(trimmed.toLowerCase())
-      : /^[\u4e00-\u9fff]{1,6}$/.test(trimmed);
     if (res.exact && !incomplete && isDictEntry) {
       resultDict.innerHTML = '<div style="color:#888;font-size:13px;">⚡ 离线词典' +
         (flipped ? '（检测到输入为英文，已按英→汉处理）' : '') + '</div>';
@@ -1156,7 +1160,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v31').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v32').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

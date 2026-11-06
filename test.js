@@ -147,12 +147,27 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   // 结果不依赖本机 8766 引擎是否在跑
   store['tw_api'] = 'http://127.0.0.1:18768/translate';
 
-  console.log('== 1. 英译汉：离线立即出结果 ==');
+  console.log('== 1. 英译汉：整句等精翻 / 单词立即出结果 ==');
+  // 用户反馈"先显示错误，再显示意思"：整句逐词拼接是劣质结果，
+  // 不能再先闪一段错误内容，改为显示"翻译中…"等引擎精翻。
   elements.src.value = 'the weather is very nice today';
   click('btn-go');
   const immediate = elements['result-text'].textContent;
-  check('点击后立即有离线结果', immediate.length > 0 && immediate !== '翻译中…', immediate);
-  check('提示正在尝试翻译源', /正在尝试更准确的翻译源/.test(elements['result-dict'].innerHTML));
+  check('整句不先显示逐词错误结果', immediate === '翻译中…', immediate);
+  check('整句提示正在翻译', /正在翻译整句/.test(elements['result-dict'].innerHTML), elements['result-dict'].innerHTML);
+  // 对照：单词命中词典时仍然立即出结果（不受整句改动影响）
+  store['tw_vocab'] = '[]';
+  store['tw_history'] = '[]';
+  boot();
+  elements.src.value = 'beautiful';
+  click('btn-go');
+  const wordImmediate = elements['result-text'].textContent;
+  check('单词仍立即出离线结果', /漂亮|美丽/.test(wordImmediate), wordImmediate);
+  check('单词标注离线词典', /离线词典/.test(elements['result-dict'].innerHTML), elements['result-dict'].innerHTML);
+  // 清掉这次对照查询的状态，避免影响后续小节（词条数/历史长度断言）
+  store['tw_vocab'] = '[]';
+  store['tw_history'] = '[]';
+  boot();
   // 单词必须显示完整多义，不能只取第一个义项（用户反馈"只给一个意思不实用"）
   check('单词返回完整多义（源码不截断首义项）',
         /return \{ text: DICT\[lower\], exact: true \}/.test(APP_SRC) &&
@@ -172,6 +187,9 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('复制译文按钮', /btn-copy/.test(html));
 
   console.log('== 2. 英译汉：联网精翻覆盖 ==');
+  // 恢复整句查询（上一段用单词做了对照校验）
+  elements.src.value = 'the weather is very nice today';
+  click('btn-go');
   // MyMemory 偶发慢：固定 sleep 5 秒会在网络抖动时误报失败。
   // 改为轮询等待在线结果（最多 20 秒），既稳定又不掩盖真实超时。
   for (let w = 0; w < 40 && !/免费接口.*句子级翻译/.test(elements['result-dict'].innerHTML); w++) {

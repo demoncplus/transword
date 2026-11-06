@@ -110,6 +110,72 @@
     return loading.full;
   }
 
+  // 把 JavaScript 源码注入页面（用 Blob URL，避免 eval / CSP 风险）
+  function injectCode(code) {
+    return new Promise(function (resolve, reject) {
+      var url = null;
+      try {
+        url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+      } catch (e) { reject(e); return; }
+      var el = document.createElement('script');
+      el.src = url;
+      el.onload = function () { try { URL.revokeObjectURL(url); } catch (_) {} resolve(); };
+      el.onerror = function () { try { URL.revokeObjectURL(url); } catch (_) {} reject(new Error('注入失败')); };
+      (document.head || document.documentElement).appendChild(el);
+    });
+  }
+
+  // 预热：完整词典已由 Service Worker 缓存在 Cache Storage 里，
+  // 这里直接读缓存注入内存，不发任何网络请求。
+  // 预热成功后所有查询都走内存词典（毫秒级），不再逐个下载分片。
+  var warmed = null;
+  function warmFull() {
+    if (loaded.full) return Promise.resolve(true);
+    if (warmed) return warmed;
+    if (!global.caches) return Promise.reject(new Error('no caches'));
+    warmed = (function () {
+      return global.caches.keys().then(function (keys) {
+        var i = 0;
+        function tryNext() {
+          if (i >= keys.length) return Promise.reject(new Error('词典未缓存'));
+          var name = keys[i++];
+          // 缓存名带版本号（transword-vNN），不能写死，取第一个有 dict.js 的
+          if (name.indexOf('transword-') !== 0) return tryNext();
+          return global.caches.open(name).then(function (c) {
+            return c.match('dict.js').then(function (hit) {
+              if (!hit) return tryNext();
+              return hit.text().then(function (t1) {
+                return injectCode(t1).then(function () {
+                  if (global.OXFORD_DICT) {
+                    Object.keys(global.OXFORD_DICT).forEach(function (k) { EN_DICT[k] = global.OXFORD_DICT[k]; });
+                    global.OXFORD_DICT = EN_DICT;
+                  }
+                  return c.match('cn-dict.js').then(function (h2) {
+                    if (!h2) { loaded.full = true; return true; }
+                    return h2.text().then(function (t2) {
+                      return injectCode(t2).then(function () {
+                        if (global.CN_DICT) {
+                          Object.keys(global.CN_DICT).forEach(function (k) { ZH_DICT[k] = global.CN_DICT[k]; });
+                          global.CN_DICT = ZH_DICT;
+                        }
+                        loaded.full = true;
+                        return true;
+                      });
+                    });
+                  });
+                });
+              });
+            });
+          });
+        }
+        return tryNext();
+      });
+    })();
+    // 失败（比如缓存还没建好）允许下次重试
+    warmed.catch(function () { warmed = null; });
+    return warmed;
+  }
+
   var EN_DICT = global.OXFORD_DICT || {};
   var ZH_DICT = global.CN_DICT || {};
   global.OXFORD_DICT = EN_DICT;
@@ -117,14 +183,16 @@
   global.TW_DICT_LOADER = {
     prepare: function (text, lang) {
       if (loaded.full) return Promise.resolve();
-      // 离线时优先加载完整词典（SW 已预缓存），而不是按需分片——分片可能没被缓存，
-      // 导致"离线查不到词"（如 iPhone 离线查 display 查不到）。
+      // 离线时优先从 Cache Storage 直读完整词典（不发请求、最快）；
+      // 缓存读不到再退回 script 注入（SW 网络优先失败后会走缓存兜底）。
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        return loadFull();
+        return warmFull().catch(function () { return loadFull(); });
       }
       return lang === 'zh2en' && !/^[a-zA-Z][a-zA-Z0-9\s'.-]*$/.test(String(text || '').trim())
         ? prepareZh(text) : prepareEn(text);
     },
+    warmFull: warmFull,
+    isWarm: function () { return !!loaded.full; },
     loadFull: loadFull,
     isLoaded: function (lang, bucket) { return !!loaded[lang + '/' + bucket]; },
     enBucket: enBucket,

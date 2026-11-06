@@ -1158,16 +1158,19 @@
           setOfflineStatus('离线词典稍后自动重试', 'warn');
         });
       }, 30000);
-      // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
+      // 词典预热：SW 缓存好完整词典后，直接读缓存注入内存，
+      // 之后所有查询走内存词典（毫秒级），不再逐个下载分片。
+      // 首次访问时缓存还没建好，所以按 3s/10s/25s/45s 重试几次，成功后停止。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v32').then(function (c) { return c.match('dict.js'); })
-        .then(function (hit) {
-          if (hit) {
-            if (navigator.onLine === false) return dictLoader.loadFull();
+      var warmTries = [3000, 10000, 25000, 45000];
+      warmTries.forEach(function (delay) {
+        setTimeout(function () {
+          if (dictLoader.isWarm && dictLoader.isWarm()) return;
+          dictLoader.warmFull().then(function () {
             setOfflineStatus('✓ 离线词典已就绪（可断网使用）', 'ready');
-          }
-        })
-        .catch(function () {});
+          }).catch(function () {});
+        }, delay);
+      });
     }).catch(function () {});
     // 新版 sw.js 激活后自动重载一次，避免页面继续跑旧资源。
     // 但不能打断用户正在进行的翻译：首次访问时 SW 激活常发生在第一次查词期间，

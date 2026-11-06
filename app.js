@@ -37,10 +37,29 @@
     return { text: translateSentenceEn2Zh(lower), exact: false };
   }
 
+  // 富词条格式："ph:音标;;n. 义项;;v. 义项"（ECDICT 富化）。
+  // 旧格式（无 ;;）整体即释义，完全兼容。
+  function parseRichEntry(entry) {
+    var s = String(entry == null ? '' : entry);
+    var segs = s.split(';;');
+    var ph = '';
+    var parts = [];
+    for (var i = 0; i < segs.length; i++) {
+      var seg = segs[i].trim();
+      if (i === 0 && seg.indexOf('ph:') === 0) { ph = seg.slice(3).trim(); continue; }
+      if (seg) parts.push(seg);
+    }
+    if (!ph && parts.length <= 1) return { ph: '', parts: s ? [s] : [] };
+    return { ph: ph, parts: parts };
+  }
+  function stripPos(s) {
+    return String(s).replace(/^[a-z]{1,5}\.\s*/, '').trim();
+  }
   // 句子逐词模式下每个词只取最常用的第一个义项，保证输出可读；
   // 完整多义只在"查单词"时展示（translateEn2Zh 的精确匹配分支）。
   function firstSense(entry) {
-    return String(entry).split(/[，,；;]/)[0].trim();
+    var rich = parseRichEntry(entry);
+    return stripPos(rich.parts[0] || '').split(/[，,；;]/)[0].trim();
   }
   // 冠词在逐词对照里是噪音（the→"那"），句子模式直接跳过
   var ARTICLES = { the: 1, a: 1, an: 1 };
@@ -425,11 +444,23 @@
     resultDict.innerHTML = '';
     savedTip.classList.add('hidden');
 
+    // 句子并行加速：整句/长短语不等词典分片下载，立刻发起引擎请求，
+    // 分片加载和引擎请求并行，句子总耗时省 1~2 秒（单词不预发，走词典秒回）。
+    var isEntryShaped = effLang === 'en2zh'
+      ? /^[a-zA-Z][a-zA-Z'-]*$/.test(text.trim())
+      : /^[\u4e00-\u9fff]{1,6}$/.test(text.trim());
+    var enginePromise = null;
+    if (!isEntryShaped && navigator.onLine !== false) {
+      var lp0 = effLang === 'zh2en' ? 'zh-CN|en' : 'en|zh-CN';
+      var api0 = getApiUrl();
+      if (api0) enginePromise = customTranslate(api0, text, lp0);
+    }
+
     // 公网首访只下载当前查询涉及的词典分片，而不是首屏下载全部 2.9MB。
     // 完整词典由 Service Worker 在后台缓存；下载完成后断网也可用。
     // 本地已带完整词典时保持同步返回；公网分片模式才需要等待加载。
     if (!dictLoader) {
-      translateLoaded(text, mySeq, effLang, flipped);
+      translateLoaded(text, mySeq, effLang, flipped, enginePromise);
       return;
     }
     var ready = dictLoader.prepare(text, effLang);
@@ -447,7 +478,7 @@
     Promise.resolve(ready).then(function () {
       clearTimeout(timeoutId);
       if (timedOut || mySeq !== reqSeq) return;
-      translateLoaded(text, mySeq, effLang, flipped);
+      translateLoaded(text, mySeq, effLang, flipped, enginePromise);
     }).catch(function () {
       clearTimeout(timeoutId);
       if (mySeq !== reqSeq) return;
@@ -481,7 +512,7 @@
     });
   }
 
-  function translateLoaded(text, mySeq, effLang, flipped) {
+  function translateLoaded(text, mySeq, effLang, flipped, enginePromise) {
 
     // 第一步：离线词典，立即出结果
     var res = translateAs(text, effLang);
@@ -508,7 +539,7 @@
       addToVocab(text, '', true, effLang, 'pending');
     } else {
       var offlineText = res.text;
-      resultText.textContent = offlineText;
+      resultText.innerHTML = renderRich(offlineText);
       resultDict.innerHTML = '<div style="color:#888;font-size:13px;">⚡ 离线词典（正在尝试更准确的翻译源…）</div>';
       addToVocab(text, offlineText, true, effLang);
       savedTip.classList.remove('hidden');
@@ -529,14 +560,19 @@
     }
 
     // 第二步：三级翻译链 自建接口 → 免费接口，成功则覆盖为更准确的句子翻译
+    // enginePromise：句子在分片加载时已并行发起的引擎请求（省 1~2 秒）
     var langpair = effLang === 'zh2en' ? 'zh-CN|en' : 'en|zh-CN';
     var api = getApiUrl();
 
-    var chain = api
-      ? customTranslate(api, text, langpair).then(function (r) {
+    var chain = enginePromise
+      ? enginePromise.then(function (r) {
           return r ? { text: r, source: '🏠 自建接口' } : null;
         })
-      : Promise.resolve(null);
+      : (api
+          ? customTranslate(api, text, langpair).then(function (r) {
+              return r ? { text: r, source: '🏠 自建接口' } : null;
+            })
+          : Promise.resolve(null));
 
     chain.then(function (hit) {
       if (hit) return hit;
@@ -781,9 +817,9 @@
       if (item.flag === 'pending') {
         dstHtml = '<span style="color:#e05252;">（暂未查到译文，引擎可用后重查即可补上）</span>';
       } else if (item.flag === 'literal') {
-        dstHtml = escapeHtml(dst) + ' <span style="color:#c8891a;font-size:12px;">［逐词直译·仅供参考］</span>';
+        dstHtml = escapeHtml(vocabDstText(dst)) + ' <span style="color:#c8891a;font-size:12px;">［逐词直译·仅供参考］</span>';
       } else {
-        dstHtml = escapeHtml(dst);
+        dstHtml = escapeHtml(vocabDstText(dst));
       }
       left.innerHTML =
         '<div class="en">' + escapeHtml(src) + ' <span style="color:#888;font-size:12px;">[' + langLabel + ']</span></div>' +
@@ -875,15 +911,67 @@
     });
   }
 
+  // 词典词条富渲染：音标行 + 每个词性一行（对照有道/百度词典的展示方式）
+  function renderRich(entry) {
+    var rich = parseRichEntry(entry);
+    if (!rich.ph && rich.parts.length === 1) return escapeHtml(rich.parts[0]);
+    var html = '';
+    if (rich.ph) html += '<div class="phonetic">/' + escapeHtml(rich.ph) + '/</div>';
+    rich.parts.forEach(function (p) {
+      var m = p.match(/^([a-z]{1,5}\.)\s*(.*)$/);
+      if (m) html += '<div class="sense"><span class="pos">' + escapeHtml(m[1]) + '</span>' + escapeHtml(m[2]) + '</div>';
+      else html += '<div class="sense">' + escapeHtml(p) + '</div>';
+    });
+    return html;
+  }
+  // 生词本/导出用的纯文本形式：去音标、去词性标签，分号连接
+  function vocabDstText(dst) {
+    var rich = parseRichEntry(dst);
+    return rich.parts.map(stripPos).join('；');
+  }
+
   // ========== 事件 ==========
   $('btn-go').onclick = doTranslate;
   $('btn-clear').onclick = function () { srcEl.value = ''; resultEl.classList.add('hidden'); srcEl.focus(); };
-  $('btn-speak').onclick = function () { 
+  $('btn-copy').onclick = function () {
+    // 对照成熟翻译站：一键复制译文
+    var text = resultText.textContent || '';
+    if (!text || text === '翻译中…') return;
+    var done = function () {
+      var btn = $('btn-copy'), old = btn.textContent;
+      btn.textContent = '✓';
+      setTimeout(function () { btn.textContent = old; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {});
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  };
+  $('btn-speak').onclick = function () {
     var textToSpeak = currentLang === 'zh2en' ? resultText.textContent : lastQuery;
     speak(textToSpeak, currentLang === 'zh2en' ? 'en-US' : 'zh-CN');
   };
   srcEl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doTranslate(); }
+  });
+
+  // 输入停顿自动翻译（对照成熟翻译站：免点按钮）。
+  // 空输入不触发；打字中途的每次变更重置计时，800ms 停顿才查。
+  var autoTranslateTimer = null;
+  srcEl.addEventListener('input', function () {
+    clearTimeout(autoTranslateTimer);
+    var val = srcEl.value.trim();
+    if (!val) return;
+    autoTranslateTimer = setTimeout(function () {
+      // 只在翻译页可见时触发，避免切到生词本后仍查询
+      if ($('page-translate').classList.contains('active') && srcEl.value.trim() === val) {
+        doTranslate();
+      }
+    }, 800);
   });
 
   // 用户主动点语言按钮 → 聚焦输入框，方便直接打字
@@ -921,7 +1009,7 @@
     var lines = ['原文\t译文\t方向\t查询次数\t时间\t备注'];
     active.forEach(function (v) {
       var dir = v.lang === 'zh2en' ? '汉→英' : '英→汉';
-      var dst = String(v.dst == null ? '' : v.dst).replace(/[\t\r\n]+/g, ' ');
+      var dst = vocabDstText(v.dst).replace(/[\t\r\n]+/g, ' ');
       // 备注列如实反映可靠性，避免导出的表格里把"逐词直译"当成准确译文
       var note = v.flag === 'pending' ? '暂未查到译文'
                : (v.flag === 'literal' ? '逐词直译·仅供参考' : '');
@@ -1068,7 +1156,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v30').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v31').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

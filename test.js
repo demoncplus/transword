@@ -13,10 +13,16 @@ function makeEl(id) {
   };
   // 真实浏览器里 innerHTML='' 会清空子节点，桩必须一致，
   // 否则 renderVocab() 每次重建列表时旧节点会残留，子节点数永远只增不减。
+  // 同时真实 DOM 的 textContent 会跟随 innerHTML（剥掉标签的纯文本），
+  // 桩必须同步这一点，否则富渲染（音标+词性分行）后断言读不到文本。
   let _html = '';
   Object.defineProperty(e, 'innerHTML', {
     get() { return _html; },
-    set(v) { _html = String(v); if (!_html) e.children.length = 0; }
+    set(v) {
+      _html = String(v);
+      if (!_html) e.children.length = 0;
+      e.textContent = _html ? _html.replace(/<[^>]*>/g, '') : _html;
+    }
   });
   e.classList = {
     add: c => e._classes.add(c),
@@ -157,6 +163,13 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   const dictSrc = fs.readFileSync('dict.js', 'utf8');
   check('短语动词已收录（get up/turn off/look for）',
         /'get up'\s*:/.test(dictSrc) && /'turn off'\s*:/.test(dictSrc) && /'look for'\s*:/.test(dictSrc));
+  check('词条富化：study 带音标和词性结构',
+        /'study'\s*:\s*'ph:(?:[^'\\]|\\.)*;;n\./.test(dictSrc), null);
+  check('前端富渲染（音标+词性分行，对照有道词典）',
+        /function renderRich/.test(APP_SRC) && /class="phonetic"/.test(APP_SRC));
+  check('生词本显示清理音标/词性标签', /function vocabDstText/.test(APP_SRC));
+  check('句子并行请求引擎（分片加载不等引擎）', /enginePromise/.test(APP_SRC));
+  check('复制译文按钮', /btn-copy/.test(html));
 
   console.log('== 2. 英译汉：联网精翻覆盖 ==');
   // MyMemory 偶发慢：固定 sleep 5 秒会在网络抖动时误报失败。

@@ -75,6 +75,9 @@ button:active, .chip:active, .tab:active, .lang-btn:active { transform: scale(0.
 .result-head { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 14px; }
 .result-text { font-size: 19px; line-height: 1.7; margin-top: 6px; white-space: pre-wrap; }
 .result-dict { margin-top: 10px; font-size: 14px; color: #444; }
+.phonetic { color: #666; font-size: 15px; margin-top: 4px; }
+.sense { margin-top: 3px; }
+.pos { color: var(--primary); font-weight: 600; margin-right: 6px; font-size: 13px; }
 .result-dict .pos { color: var(--primary); font-weight: 600; margin-right: 6px; }
 .saved-tip { margin-top: 10px; font-size: 13px; color: #2ba84a; }
 

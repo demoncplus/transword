@@ -37,20 +37,38 @@
     return { text: translateSentenceEn2Zh(lower), exact: false };
   }
 
+  // 句子逐词模式下每个词只取最常用的第一个义项，保证输出可读；
+  // 完整多义只在"查单词"时展示（translateEn2Zh 的精确匹配分支）。
+  function firstSense(entry) {
+    return String(entry).split(/[，,；;]/)[0].trim();
+  }
+  // 冠词在逐词对照里是噪音（the→"那"），句子模式直接跳过
+  var ARTICLES = { the: 1, a: 1, an: 1 };
+
   function translateSentenceEn2Zh(text) {
     var words = text.replace(/[^a-z0-9\s'-]/g, ' ').split(/\s+/).filter(Boolean);
     if (!words.length) return '';
-    
+
     var results = [];
     var i = 0;
     while (i < words.length) {
-      // 优先匹配2-3词短语
+      // 冠词去噪（the→"那"），必须在短语匹配之前跳过
+      if (ARTICLES[words[i]] && !DICT[words.slice(i, i + 2).join(' ')] && !DICT[words.slice(i, i + 3).join(' ')]) {
+        // 冠词后面没有紧跟的短语词条（如 "the united states"）时才跳过
+        var hasPhrase = false;
+        for (var pl = 3; pl >= 2; pl--) {
+          if (i + pl <= words.length && DICT[words.slice(i, i + pl).join(' ')]) { hasPhrase = true; break; }
+        }
+        if (!hasPhrase) { i++; continue; }
+      }
+      // 优先匹配2-3词短语（短语动词：get up / turn off / look for…）
       var found = false;
       for (var len = 3; len >= 1; len--) {
         if (i + len > words.length) continue;
         var phrase = words.slice(i, i + len).join(' ');
         if (DICT[phrase]) {
-          results.push(DICT[phrase]);
+          var ps = firstSense(DICT[phrase]);
+          if (ps) results.push(ps);
           i += len;
           found = true;
           break;
@@ -78,7 +96,12 @@
           else if (w.endsWith('est') && w.length > 5) trans = DICT[w.slice(0, -3)];
           else if (w.endsWith('ly') && w.length > 4) trans = DICT[w.slice(0, -2)];
         }
-        results.push(trans || ('[' + w + ']'));
+        if (trans) {
+          var ws = firstSense(trans);
+          if (ws) results.push(ws);
+        } else {
+          results.push('[' + w + ']');
+        }
         i++;
       }
     }
@@ -1045,7 +1068,7 @@
       }, 30000);
       // 断网重开：直接读已缓存的完整词典，不要求曾逐个下载过所有分片。
       if (!dictLoader || !window.caches) return;
-      caches.open('transword-v28').then(function (c) { return c.match('dict.js'); })
+      caches.open('transword-v30').then(function (c) { return c.match('dict.js'); })
         .then(function (hit) {
           if (hit) {
             if (navigator.onLine === false) return dictLoader.loadFull();

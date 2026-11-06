@@ -4,8 +4,8 @@
   "chunks": {
     "en/a": {
       "url": "chunks/en/a.js",
-      "entries": 1462,
-      "bytes": 72178
+      "entries": 1466,
+      "bytes": 72262
     },
     "en/b": {
       "url": "chunks/en/b.js",
@@ -14,8 +14,8 @@
     },
     "en/c": {
       "url": "chunks/en/c.js",
-      "entries": 2317,
-      "bytes": 121622
+      "entries": 2324,
+      "bytes": 121789
     },
     "en/d": {
       "url": "chunks/en/d.js",
@@ -24,43 +24,43 @@
     },
     "en/e": {
       "url": "chunks/en/e.js",
-      "entries": 1048,
-      "bytes": 54268
+      "entries": 1049,
+      "bytes": 54287
     },
     "en/f": {
       "url": "chunks/en/f.js",
-      "entries": 1027,
-      "bytes": 58173
+      "entries": 1030,
+      "bytes": 58231
     },
     "en/g": {
       "url": "chunks/en/g.js",
-      "entries": 802,
-      "bytes": 40067
+      "entries": 810,
+      "bytes": 40228
     },
     "en/h": {
       "url": "chunks/en/h.js",
-      "entries": 985,
-      "bytes": 48165
+      "entries": 987,
+      "bytes": 48209
     },
     "en/i": {
       "url": "chunks/en/i.js",
-      "entries": 1089,
-      "bytes": 57617
+      "entries": 1090,
+      "bytes": 57639
     },
     "en/j": {
       "url": "chunks/en/j.js",
-      "entries": 225,
-      "bytes": 12228
+      "entries": 226,
+      "bytes": 12248
     },
     "en/k": {
       "url": "chunks/en/k.js",
-      "entries": 264,
-      "bytes": 12367
+      "entries": 265,
+      "bytes": 12386
     },
     "en/l": {
       "url": "chunks/en/l.js",
-      "entries": 817,
-      "bytes": 44597
+      "entries": 823,
+      "bytes": 44724
     },
     "en/m": {
       "url": "chunks/en/m.js",
@@ -69,8 +69,8 @@
     },
     "en/n": {
       "url": "chunks/en/n.js",
-      "entries": 486,
-      "bytes": 24760
+      "entries": 487,
+      "bytes": 24781
     },
     "en/o": {
       "url": "chunks/en/o.js",
@@ -79,8 +79,8 @@
     },
     "en/p": {
       "url": "chunks/en/p.js",
-      "entries": 1955,
-      "bytes": 114864
+      "entries": 1962,
+      "bytes": 115016
     },
     "en/q": {
       "url": "chunks/en/q.js",
@@ -89,23 +89,23 @@
     },
     "en/r": {
       "url": "chunks/en/r.js",
-      "entries": 1346,
-      "bytes": 80490
+      "entries": 1349,
+      "bytes": 80550
     },
     "en/s": {
       "url": "chunks/en/s.js",
-      "entries": 2786,
-      "bytes": 163964
+      "entries": 2790,
+      "bytes": 164050
     },
     "en/t": {
       "url": "chunks/en/t.js",
-      "entries": 1356,
-      "bytes": 77280
+      "entries": 1365,
+      "bytes": 77490
     },
     "en/u": {
       "url": "chunks/en/u.js",
-      "entries": 930,
-      "bytes": 53720
+      "entries": 931,
+      "bytes": 53738
     },
     "en/v": {
       "url": "chunks/en/v.js",
@@ -114,8 +114,8 @@
     },
     "en/w": {
       "url": "chunks/en/w.js",
-      "entries": 702,
-      "bytes": 41041
+      "entries": 706,
+      "bytes": 41131
     },
     "en/x": {
       "url": "chunks/en/x.js",

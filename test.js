@@ -151,6 +151,12 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('单词返回完整多义（源码不截断首义项）',
         /return \{ text: DICT\[lower\], exact: true \}/.test(APP_SRC) &&
         /return \{ text: CN_DICT\[text\], exact: true, missing: 0 \}/.test(APP_SRC));
+  // 句子逐词模式：首义项 + 冠词去噪（用户反馈"词义检测继续优化"）
+  check('句子模式每词只取首义项（可读）', /function firstSense/.test(APP_SRC) && /firstSense\(DICT\[phrase\]\)/.test(APP_SRC));
+  check('句子模式跳过冠词（the/a/an 噪音）', /ARTICLES\[words\[i\]\]/.test(APP_SRC));
+  const dictSrc = fs.readFileSync('dict.js', 'utf8');
+  check('短语动词已收录（get up/turn off/look for）',
+        /'get up'\s*:/.test(dictSrc) && /'turn off'\s*:/.test(dictSrc) && /'look for'\s*:/.test(dictSrc));
 
   console.log('== 2. 英译汉：联网精翻覆盖 ==');
   // MyMemory 偶发慢：固定 sleep 5 秒会在网络抖动时误报失败。

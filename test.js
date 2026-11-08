@@ -771,7 +771,12 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('11j-1 联想容器存在', /id="suggest-box"/.test(fs.readFileSync('index.html', 'utf8')));
   check('11j-2 联想逻辑存在', /function renderSuggest/.test(APP_SRC) && /lastIndexOf\(q, 0\) === 0/.test(APP_SRC));
   check('11j-3 联想只在英译汉模式生效', /currentLang !== 'en2zh'/.test(APP_SRC));
-  check('11j-4 点选联想词直接翻译', /srcEl\.value = w;[\s\S]{0,60}doTranslate\(\)/.test(APP_SRC));
+  check('11j-4 点选联想词直接翻译',
+        /function pickSuggest\(word\)[\s\S]{0,80}srcEl\.value = word[\s\S]{0,60}doTranslate\(\)/.test(APP_SRC));
+  check('11j-5 键盘导航（↑↓ 选择 / Enter 确认 / Esc 关闭）',
+        /ArrowDown/.test(APP_SRC) && /ArrowUp/.test(APP_SRC) &&
+        /highlightSuggest/.test(APP_SRC) && /Escape/.test(APP_SRC));
+  check('11j-6 选中项有高亮样式', /\.suggest-item\.active/.test(fs.readFileSync('style.css', 'utf8')));
   store['tw_vocab'] = '[]';
   boot();
 

@@ -1049,6 +1049,32 @@
     speak(textToSpeak, currentLang === 'zh2en' ? 'en-US' : 'zh-CN');
   };
   srcEl.addEventListener('keydown', function (e) {
+    var box = $('suggest-box');
+    var suggestOpen = box && !box.classList.contains('hidden') && suggestItems.length > 0;
+    // 联想面板打开时：↑↓ 选择、Enter 确认选中项、Esc 关闭
+    if (suggestOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightSuggest(Math.min(suggestIndex + 1, suggestItems.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightSuggest(Math.max(suggestIndex - 1, -1));
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        hideSuggest();
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // 有选中项→用选中词；没选中→用当前输入的词
+        pickSuggest(suggestIndex >= 0 ? suggestItems[suggestIndex] : srcEl.value.trim());
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doTranslate(); }
   });
 
@@ -1057,9 +1083,28 @@
   var autoTranslateTimer = null;
   // 输入联想：英文模式下边打边提示候选单词（点击直接查）
   var suggestTimer = null;
+  var suggestItems = [], suggestIndex = -1;
   function hideSuggest() {
     var box = $('suggest-box');
     if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+    suggestItems = []; suggestIndex = -1;
+  }
+  function highlightSuggest(idx) {
+    var box = $('suggest-box');
+    if (!box) return;
+    var els = box.querySelectorAll('.suggest-item');
+    for (var i = 0; i < els.length; i++) {
+      els[i].classList.toggle('active', i === idx);
+    }
+    suggestIndex = idx;
+    if (idx >= 0 && els[idx] && els[idx].scrollIntoView) {
+      try { els[idx].scrollIntoView({ block: 'nearest' }); } catch (e) {}
+    }
+  }
+  function pickSuggest(word) {
+    srcEl.value = word;
+    hideSuggest();
+    doTranslate();
   }
   function renderSuggest() {
     var box = $('suggest-box');
@@ -1081,18 +1126,16 @@
     hits.sort(function (a, b) { return a.length - b.length; });
     hits = hits.slice(0, 8);
     box.innerHTML = '';
-    hits.forEach(function (w) {
+    suggestItems = hits;
+    suggestIndex = -1;
+    hits.forEach(function (w, idx) {
       var d = document.createElement('div');
       d.className = 'suggest-item';
       var rich = parseRichEntry(DICT[w]);
       var gloss = stripPos(rich.parts[0] || '').split(/[，,；;]/)[0];
       d.innerHTML = '<span class="w">' + escapeHtml(w) + '</span>' +
                     '<span class="t">' + escapeHtml(gloss) + '</span>';
-      d.onclick = function () {
-        srcEl.value = w;
-        hideSuggest();
-        doTranslate();
-      };
+      d.onclick = function () { pickSuggest(w); };
       box.appendChild(d);
     });
     box.classList.remove('hidden');
@@ -1106,11 +1149,14 @@
     // 联想稍快（200ms）出结果；自动翻译在有联想时延后，给用户点选时间
     suggestTimer = setTimeout(renderSuggest, 200);
     autoTranslateTimer = setTimeout(function () {
-      // 只在翻译页可见时触发，避免切到生词本后仍查询
-      if ($('page-translate').classList.contains('active') && srcEl.value.trim() === val) {
-        hideSuggest();
-        doTranslate();
-      }
+      if (!$('page-translate').classList.contains('active') || srcEl.value.trim() !== val) return;
+      var box = $('suggest-box');
+      var suggestOpen = box && !box.classList.contains('hidden');
+      // 输入是不完整前缀（联想开着、且这个词本身不在词典）→ 等用户点选，别抢着查半截词
+      var completeWord = DICT[val.toLowerCase()] || /^[\u4e00-\u9fff]/.test(val);
+      if (suggestOpen && !completeWord) return;
+      hideSuggest();
+      doTranslate();
     }, 800);
   });
   // 失焦/换页时收起联想

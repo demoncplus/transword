@@ -818,6 +818,23 @@
     scheduleSync();
   }
 
+  // 生词本里的译文：**保留词性前缀**（n./vt./vi.），只去掉音标。
+  // 全去掉会把多词性词的义项混成一串（"学习,研究…；学习,读书…"），
+  // 用户看不出哪组是哪个词性，反而比翻译页难读。
+  function vocabDstHtml(dst) {
+    var raw = String(dst == null ? '' : dst);
+    var rich = parseRichEntry(raw);
+    if (!rich.parts.length) return escapeHtml(raw);
+    return rich.parts.map(function (p) {
+      var m = String(p).match(/^([a-z]{1,5}\.)\s*(.*)$/);
+      if (m) {
+        return '<span style="color:var(--primary);font-weight:600;font-size:12px;margin-right:4px;">' +
+          escapeHtml(m[1]) + '</span>' + escapeHtml(m[2]);
+      }
+      return escapeHtml(p);
+    }).join('；');
+  }
+
   function renderVocab() {
     var list = $('vocab-list');
     var q = ($('vocab-search').value || '').trim().toLowerCase();
@@ -843,7 +860,7 @@
       } else if (item.flag === 'literal') {
         dstHtml = escapeHtml(vocabDstText(dst)) + ' <span style="color:#c8891a;font-size:12px;">［逐词直译·仅供参考］</span>';
       } else {
-        dstHtml = escapeHtml(vocabDstText(dst));
+        dstHtml = vocabDstHtml(dst);
       }
       left.innerHTML =
         '<div class="en">' + escapeHtml(src) + ' <span style="color:#888;font-size:12px;">[' + langLabel + ']</span></div>' +
@@ -853,6 +870,14 @@
         (item.right || item.wrong
           ? ' · 复习 <span style="color:#2ba84a;">✓' + (item.right || 0) + '</span> <span style="color:#e05252;">✗' + (item.wrong || 0) + '</span>'
           : '') + '</div>';
+      // 点词条回翻译页重查（看音标、听发音、看完整词性分行）
+      left.style.cursor = 'pointer';
+      left.onclick = function () {
+        switchTab('translate');
+        setLang(item.lang === 'zh2en' ? 'zh2en' : 'en2zh');
+        srcEl.value = src;          // setLang 会清空输入框，必须在它之后赋值
+        doTranslate();
+      };
 
       var ops = document.createElement('div');
       ops.className = 'ops';
@@ -931,6 +956,8 @@
     $('review-panel').classList.remove('hidden');
     $('vocab-list').classList.add('hidden');
     $('vocab-empty').style.display = 'none';
+    // 复习时工具栏（搜索/导出/清空）没有意义，收起来让卡片占满
+    if ($('vocab-toolbar')) $('vocab-toolbar').classList.add('hidden');
     showReviewCard();
   }
 
@@ -975,6 +1002,7 @@
   function exitReview() {
     $('review-panel').classList.add('hidden');
     $('vocab-list').classList.remove('hidden');
+    if ($('vocab-toolbar')) $('vocab-toolbar').classList.remove('hidden');
     renderVocab();
   }
 

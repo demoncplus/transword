@@ -42,7 +42,7 @@ const IDS = ['src','result','result-src','result-text','result-dict','saved-tip'
   'tab-translate','tab-vocab','page-translate','page-vocab','lang-en2zh','lang-zh2en',
   'suggest-box',
   'btn-review','review-panel','review-progress','review-card','review-question',
-  'review-answer','review-actions','review-done',
+  'review-answer','review-actions','review-done','vocab-toolbar',
   'btn-review-show','btn-review-right','btn-review-wrong','btn-review-exit',
   'sync-status','offline-status','sync-login','sync-info','sync-hint','sync-toggle',
   'sync-user','sync-pass','sync-user-err','sync-pass-err',
@@ -790,6 +790,29 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
         elements['review-panel']._classes.has('hidden') && !elements['vocab-list']._classes.has('hidden'));
   check('11i-12 复习成绩导出为独立列',
         /复习\(对\)/.test(fs.readFileSync('app.js', 'utf8')));
+  check('11i-13 复习时隐藏工具栏（搜索/导出/清空无意义）',
+        /vocab-toolbar'\)\.classList\.add\('hidden'\)/.test(APP_SRC) &&
+        /vocab-toolbar'\)\.classList\.remove\('hidden'\)/.test(APP_SRC));
+
+  console.log('\n== 11l. 生词本：词性标签保留 + 点词条重查 ==');
+  store['tw_vocab'] = JSON.stringify([
+    { src: 'study', dst: "ph:'stʌdi;;n. 学习, 研究;;vt. 读书;;vi. 思索", lang: 'en2zh', ts: 5000, count: 1, flag: '' }
+  ]);
+  boot();
+  click('tab-vocab');
+  const vocabHtml = elements['vocab-list'].children[0].children[0].innerHTML;
+  check('11l-1 生词本保留词性标签（不混成一串）',
+        /n\./.test(vocabHtml) && /vt\./.test(vocabHtml) && /vi\./.test(vocabHtml), vocabHtml.slice(0, 120));
+  check('11l-2 生词本不显示音标', !/ph:/.test(vocabHtml) && !/stʌdi/.test(vocabHtml));
+  check('11l-3 点词条可回翻译页重查',
+        typeof elements['vocab-list'].children[0].children[0].onclick === 'function');
+  // 模拟点击词条
+  elements['vocab-list'].children[0].children[0].onclick();
+  check('11l-4 点词条后跳到翻译页并填入该词',
+        elements['page-translate']._classes.has('active') && elements.src.value === 'study',
+        elements.src.value);
+  store['tw_vocab'] = '[]';
+  boot();
 
   console.log('\n== 11j. 输入联想（边打边提示）==');
   store['tw_vocab'] = '[]';

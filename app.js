@@ -382,7 +382,11 @@
       var count = (typeof it.count === 'number' && it.count > 0) ? Math.floor(it.count) : 1;
       // flag: '' 正常译文 | 'literal' 逐词直译（仅供参考）| 'pending' 暂未收录译文
       var flag = (it.flag === 'literal' || it.flag === 'pending') ? it.flag : '';
-      out.push({ src: src, dst: dst, lang: lang, ts: ts, count: count, flag: flag, deleted: !!it.deleted });
+      // right/wrong：复习模式里「记住了/没记住」的累计次数（用于优先复习生疏词）
+      var right = (typeof it.right === 'number' && it.right > 0) ? Math.floor(it.right) : 0;
+      var wrong = (typeof it.wrong === 'number' && it.wrong > 0) ? Math.floor(it.wrong) : 0;
+      out.push({ src: src, dst: dst, lang: lang, ts: ts, count: count, flag: flag,
+                 deleted: !!it.deleted, right: right, wrong: wrong });
     });
     return out;
   }
@@ -700,6 +704,9 @@
       if (!old) { map[k] = x; return; }
       // ts 更新的一方胜出（deleted 作为版本属性随 ts 传播）
       if ((x.ts || 0) > (old.ts || 0)) {
+        // 复习成绩是累计值：换主前先把两边的最大值带过去，避免同步丢进度
+        x.right = Math.max(x.right || 0, old.right || 0);
+        x.wrong = Math.max(x.wrong || 0, old.wrong || 0);
         map[k] = x;
         return;
       }
@@ -711,6 +718,8 @@
         if (x.flag === '' || (old.flag !== '' && x.flag !== 'pending')) old.flag = x.flag;
       }
       old.count = Math.max(old.count || 1, x.count || 1);
+      old.right = Math.max(old.right || 0, x.right || 0);
+      old.wrong = Math.max(old.wrong || 0, x.wrong || 0);
     });
     return Object.keys(map).map(function (k) { return map[k]; })
       .sort(function (x, y) { return (y.ts || 0) - (x.ts || 0); });
@@ -829,7 +838,10 @@
         '<div class="en">' + escapeHtml(src) + ' <span style="color:#888;font-size:12px;">[' + langLabel + ']</span></div>' +
         '<div class="zh">' + dstHtml + '</div>' +
         '<div class="meta">' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-        ' · 查询 ' + (item.count || 1) + ' 次</div>';
+        ' · 查询 ' + (item.count || 1) + ' 次' +
+        (item.right || item.wrong
+          ? ' · 复习 <span style="color:#2ba84a;">✓' + (item.right || 0) + '</span> <span style="color:#e05252;">✗' + (item.wrong || 0) + '</span>'
+          : '') + '</div>';
 
       var ops = document.createElement('div');
       ops.className = 'ops';
@@ -877,6 +889,83 @@
   }
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  // ========== 复习模式（记忆卡片） ==========
+  // 从生词本抽 20 个词自测：先看原文回忆译文，再自评「记住了/没记住」。
+  // 生疏词（wrong 多）优先出现；成绩累积在条目上，跨设备同步。
+  var reviewQueue = [], reviewIndex = 0, reviewStats = { right: 0, wrong: 0 };
+
+  function reviewPool() {
+    return vocab.filter(function (v) {
+      return !v.deleted && v.dst && v.flag !== 'pending';
+    });
+  }
+
+  function startReview() {
+    var pool = reviewPool();
+    if (!pool.length) {
+      alert('生词本里还没有可复习的词（暂未查到译文的词不能复习）');
+      return;
+    }
+    // 生疏度 = 没记住次数 - 记住次数，越高越先复习；同分随机打散
+    pool.sort(function (a, b) {
+      var wa = (a.wrong || 0) - (a.right || 0);
+      var wb = (b.wrong || 0) - (b.right || 0);
+      if (wb !== wa) return wb - wa;
+      return Math.random() - 0.5;
+    });
+    reviewQueue = pool.slice(0, 20);
+    reviewIndex = 0;
+    reviewStats = { right: 0, wrong: 0 };
+    $('review-panel').classList.remove('hidden');
+    $('vocab-list').classList.add('hidden');
+    $('vocab-empty').style.display = 'none';
+    showReviewCard();
+  }
+
+  function showReviewCard() {
+    if (reviewIndex >= reviewQueue.length) { finishReview(); return; }
+    var item = reviewQueue[reviewIndex];
+    $('review-card').classList.remove('hidden');
+    $('review-actions').classList.remove('hidden');
+    $('review-done').classList.add('hidden');
+    $('review-progress').textContent = (reviewIndex + 1) + ' / ' + reviewQueue.length;
+    $('review-question').textContent = String(item.src || '');
+    $('review-answer').textContent = vocabDstText(item.dst || '');
+    $('review-answer').classList.add('hidden');
+    $('btn-review-show').classList.remove('hidden');
+    $('btn-review-right').classList.add('hidden');
+    $('btn-review-wrong').classList.add('hidden');
+  }
+
+  function markReview(ok) {
+    var item = reviewQueue[reviewIndex];
+    if (item) {
+      if (ok) item.right = (item.right || 0) + 1;
+      else item.wrong = (item.wrong || 0) + 1;
+      if (ok) reviewStats.right++; else reviewStats.wrong++;
+      save(LS_VOCAB, vocab);
+      scheduleSync();   // 复习成绩也跨设备同步
+    }
+    reviewIndex++;
+    showReviewCard();
+  }
+
+  function finishReview() {
+    $('review-card').classList.add('hidden');
+    $('review-actions').classList.add('hidden');
+    $('review-done').classList.remove('hidden');
+    $('review-progress').textContent = '完成';
+    $('review-done').innerHTML = '本轮复习完成！<br>记住 <b>' + reviewStats.right +
+      '</b> 个，没记住 <b>' + reviewStats.wrong + '</b> 个' +
+      (reviewStats.wrong ? '<br><span style="color:#c8891a;font-size:13px;">没记住的词下次会优先出现</span>' : '');
+  }
+
+  function exitReview() {
+    $('review-panel').classList.add('hidden');
+    $('vocab-list').classList.remove('hidden');
+    renderVocab();
+  }
 
   function addHistory(text) {
     var key = text.toLowerCase();
@@ -966,21 +1055,82 @@
   // 输入停顿自动翻译（对照成熟翻译站：免点按钮）。
   // 空输入不触发；打字中途的每次变更重置计时，800ms 停顿才查。
   var autoTranslateTimer = null;
+  // 输入联想：英文模式下边打边提示候选单词（点击直接查）
+  var suggestTimer = null;
+  function hideSuggest() {
+    var box = $('suggest-box');
+    if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+  }
+  function renderSuggest() {
+    var box = $('suggest-box');
+    if (!box) return;
+    var q = (srcEl.value || '').trim().toLowerCase();
+    // 只在英译汉、且输入是纯英文前缀时提示（句子不联想）
+    if (currentLang !== 'en2zh' || !q || !/^[a-z][a-z'-]*$/.test(q) || q.length < 1) {
+      hideSuggest(); return;
+    }
+    var hits = [];
+    for (var k in DICT) {
+      if (k.length > q.length && k.lastIndexOf(q, 0) === 0) {
+        hits.push(k);
+        if (hits.length >= 80) break;
+      }
+    }
+    if (!hits.length) { hideSuggest(); return; }
+    // 短的优先（study 比 studious 更常用）
+    hits.sort(function (a, b) { return a.length - b.length; });
+    hits = hits.slice(0, 8);
+    box.innerHTML = '';
+    hits.forEach(function (w) {
+      var d = document.createElement('div');
+      d.className = 'suggest-item';
+      var rich = parseRichEntry(DICT[w]);
+      var gloss = stripPos(rich.parts[0] || '').split(/[，,；;]/)[0];
+      d.innerHTML = '<span class="w">' + escapeHtml(w) + '</span>' +
+                    '<span class="t">' + escapeHtml(gloss) + '</span>';
+      d.onclick = function () {
+        srcEl.value = w;
+        hideSuggest();
+        doTranslate();
+      };
+      box.appendChild(d);
+    });
+    box.classList.remove('hidden');
+  }
+
   srcEl.addEventListener('input', function () {
     clearTimeout(autoTranslateTimer);
+    clearTimeout(suggestTimer);
     var val = srcEl.value.trim();
-    if (!val) return;
+    if (!val) { hideSuggest(); return; }
+    // 联想稍快（200ms）出结果；自动翻译在有联想时延后，给用户点选时间
+    suggestTimer = setTimeout(renderSuggest, 200);
     autoTranslateTimer = setTimeout(function () {
       // 只在翻译页可见时触发，避免切到生词本后仍查询
       if ($('page-translate').classList.contains('active') && srcEl.value.trim() === val) {
+        hideSuggest();
         doTranslate();
       }
     }, 800);
   });
+  // 失焦/换页时收起联想
+  srcEl.addEventListener('blur', function () { setTimeout(hideSuggest, 150); });
 
   // 用户主动点语言按钮 → 聚焦输入框，方便直接打字
   $('lang-en2zh').onclick = function () { setLang('en2zh', true); };
   $('lang-zh2en').onclick = function () { setLang('zh2en', true); };
+
+  // ========== 复习模式按钮 ==========
+  $('btn-review').onclick = startReview;
+  $('btn-review-exit').onclick = exitReview;
+  $('btn-review-show').onclick = function () {
+    $('review-answer').classList.remove('hidden');
+    $('btn-review-show').classList.add('hidden');
+    $('btn-review-right').classList.remove('hidden');
+    $('btn-review-wrong').classList.remove('hidden');
+  };
+  $('btn-review-right').onclick = function () { markReview(true); };
+  $('btn-review-wrong').onclick = function () { markReview(false); };
 
   $('tab-translate').onclick = function () { switchTab('translate'); };
   $('tab-vocab').onclick = function () { switchTab('vocab'); };
@@ -989,7 +1139,11 @@
     $('tab-vocab').classList.toggle('active', name === 'vocab');
     $('page-translate').classList.toggle('active', name === 'translate');
     $('page-vocab').classList.toggle('active', name === 'vocab');
-    if (name === 'vocab') renderVocab();
+    if (name === 'vocab') {
+      exitReview();   // 进入生词本时退出复习模式，显示列表
+    } else {
+      hideSuggest();
+    }
   }
 
   $('vocab-search').addEventListener('input', renderVocab);
@@ -1010,7 +1164,7 @@
   $('btn-export').onclick = function () {
     var active = vocab.filter(function (v) { return !v.deleted; });
     if (!active.length) { alert('生词本为空'); return; }
-    var lines = ['原文\t译文\t方向\t查询次数\t时间\t备注'];
+    var lines = ['原文\t译文\t方向\t查询次数\t复习(对)\t复习(错)\t时间\t备注'];
     active.forEach(function (v) {
       var dir = v.lang === 'zh2en' ? '汉→英' : '英→汉';
       var dst = vocabDstText(v.dst).replace(/[\t\r\n]+/g, ' ');
@@ -1018,6 +1172,7 @@
       var note = v.flag === 'pending' ? '暂未查到译文'
                : (v.flag === 'literal' ? '逐词直译·仅供参考' : '');
       lines.push([String(v.src).replace(/\t/g, ' '), dst, dir, v.count || 1,
+        v.right || 0, v.wrong || 0,
         new Date(v.ts).toLocaleString(), note].join('\t'));
     });
     var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });

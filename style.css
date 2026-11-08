@@ -78,6 +78,35 @@ button:active, .chip:active, .tab:active, .lang-btn:active { transform: scale(0.
 .phonetic { color: #666; font-size: 15px; margin-top: 4px; }
 .sense { margin-top: 3px; }
 .pos { color: var(--primary); font-weight: 600; margin-right: 6px; font-size: 13px; }
+
+/* 输入联想下拉 */
+.suggest-box {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 20;
+  background: var(--card); border: 1.5px solid #dfe4f2; border-radius: 12px;
+  margin-top: 4px; box-shadow: 0 6px 20px rgba(30,40,80,.12);
+  max-height: 240px; overflow-y: auto;
+}
+.suggest-item {
+  padding: 10px 12px; font-size: 15px; cursor: pointer;
+  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+}
+.suggest-item:active, .suggest-item.active { background: #eef1fb; }
+.suggest-item .w { font-weight: 600; }
+.suggest-item .t { color: var(--muted); font-size: 13px; text-align: right; word-break: break-word; }
+
+/* 复习模式 */
+.review-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
+.review-head button { padding: 6px 10px; font-size: 13px; min-height: 34px; }
+.review-card {
+  min-height: 150px; border: 1.5px solid #dfe4f2; border-radius: 14px;
+  padding: 18px; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; gap: 12px; text-align: center; background: var(--card);
+}
+.review-question { font-size: 26px; font-weight: 600; word-break: break-word; }
+.review-answer { font-size: 18px; color: #2ba84a; line-height: 1.6; word-break: break-word; }
+.review-actions { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.review-actions button { min-width: 110px; }
+.review-done { text-align: center; color: #2ba84a; font-size: 15px; margin-top: 14px; line-height: 1.7; }
 .result-dict .pos { color: var(--primary); font-weight: 600; margin-right: 6px; }
 .saved-tip { margin-top: 10px; font-size: 13px; color: #2ba84a; }
 

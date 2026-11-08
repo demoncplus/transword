@@ -38,8 +38,15 @@ function makeEl(id) {
 
 const IDS = ['src','result','result-src','result-text','result-dict','saved-tip',
   'history-block','history-list','vocab-list','vocab-empty','vocab-count','vocab-search',
-  'btn-go','btn-clear','btn-speak','btn-clear-vocab','btn-export',
-  'tab-translate','tab-vocab','page-translate','page-vocab','lang-en2zh','lang-zh2en'];
+  'btn-go','btn-clear','btn-speak','btn-copy','btn-clear-vocab','btn-export',
+  'tab-translate','tab-vocab','page-translate','page-vocab','lang-en2zh','lang-zh2en',
+  'suggest-box',
+  'btn-review','review-panel','review-progress','review-card','review-question',
+  'review-answer','review-actions','review-done',
+  'btn-review-show','btn-review-right','btn-review-wrong','btn-review-exit',
+  'sync-status','offline-status','sync-login','sync-info','sync-hint',
+  'sync-user','sync-pass','sync-user-err','sync-pass-err',
+  'btn-sync-login','btn-sync-register','btn-sync-logout','btn-toggle-pass','sync-user-label'];
 const elements = {};
 IDS.forEach(id => elements[id] = makeEl(id));
 
@@ -713,6 +720,58 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   // 复位，避免影响后续小节
   delete store['tw_api'];
   delete global.fetch;
+  store['tw_vocab'] = '[]';
+  boot();
+
+  console.log('\n== 11i. 生词本复习模式（记忆卡片）==');
+  store['tw_vocab'] = JSON.stringify([
+    { src: 'apple', dst: '苹果', lang: 'en2zh', ts: 1000, count: 1, flag: '' },
+    { src: 'banana', dst: '香蕉', lang: 'en2zh', ts: 2000, count: 1, flag: '' },
+    { src: 'cherry', dst: '樱桃', lang: 'en2zh', ts: 3000, count: 1, flag: '', wrong: 3 }
+  ]);
+  boot();
+  click('btn-review');
+  check('11i-1 复习面板打开、列表隐藏',
+        !elements['review-panel']._classes.has('hidden') && elements['vocab-list']._classes.has('hidden'));
+  check('11i-2 生疏词优先出现（wrong=3 的 cherry 排第一）',
+        elements['review-question'].textContent === 'cherry', elements['review-question'].textContent);
+  check('11i-3 答案默认隐藏',
+        elements['review-answer']._classes.has('hidden'));
+  check('11i-4 显示进度 1 / 3',
+        /^1 \/ 3$/.test(elements['review-progress'].textContent), elements['review-progress'].textContent);
+  // 点显示答案
+  click('btn-review-show');
+  check('11i-5 揭晓答案且答案正确',
+        !elements['review-answer']._classes.has('hidden') && /樱桃/.test(elements['review-answer'].textContent),
+        elements['review-answer'].textContent);
+  check('11i-6 揭晓后出现记住了/没记住按钮',
+        !elements['btn-review-right']._classes.has('hidden') && !elements['btn-review-wrong']._classes.has('hidden'));
+  // 标记没记住
+  click('btn-review-wrong');
+  const afterWrong = JSON.parse(store['tw_vocab']).find(v => v.src === 'cherry');
+  check('11i-7 没记住会累加到该词条', afterWrong && afterWrong.wrong === 4, afterWrong && afterWrong.wrong);
+  check('11i-8 进度前进到 2 / 3', /^2 \/ 3$/.test(elements['review-progress'].textContent), elements['review-progress'].textContent);
+  // 走完全部
+  click('btn-review-show'); click('btn-review-right');
+  click('btn-review-show'); click('btn-review-right');
+  check('11i-9 完成后显示统计',
+        !elements['review-done']._classes.has('hidden') && /记住/.test(elements['review-done'].innerHTML),
+        elements['review-done'].innerHTML);
+  check('11i-10 复习成绩持久化到生词本', JSON.parse(store['tw_vocab']).some(v => v.right > 0));
+  // 退出复习恢复列表
+  click('btn-review-exit');
+  check('11i-11 退出复习后列表恢复显示',
+        elements['review-panel']._classes.has('hidden') && !elements['vocab-list']._classes.has('hidden'));
+  check('11i-12 复习成绩导出为独立列',
+        /复习\(对\)/.test(fs.readFileSync('app.js', 'utf8')));
+
+  console.log('\n== 11j. 输入联想（边打边提示）==');
+  store['tw_vocab'] = '[]';
+  boot();
+  check('11j-1 联想容器存在', /id="suggest-box"/.test(fs.readFileSync('index.html', 'utf8')));
+  check('11j-2 联想逻辑存在', /function renderSuggest/.test(APP_SRC) && /lastIndexOf\(q, 0\) === 0/.test(APP_SRC));
+  check('11j-3 联想只在英译汉模式生效', /currentLang !== 'en2zh'/.test(APP_SRC));
+  check('11j-4 点选联想词直接翻译', /srcEl\.value = w;[\s\S]{0,60}doTranslate\(\)/.test(APP_SRC));
   store['tw_vocab'] = '[]';
   boot();
 

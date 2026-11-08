@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#4a6cf7">
 <title>译词通 - 英汉翻译 · 自动生词本</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="style.css?v=37">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 </head>
@@ -60,6 +60,7 @@
     <div class="input-box">
       <!-- 不加 autofocus：手机上会自动弹出键盘挡住半屏，用户还没看清界面就被键盘顶开 -->
       <textarea id="src" rows="3" placeholder="输入英文单词或句子，回车翻译…" enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+      <div id="suggest-box" class="suggest-box hidden"></div>
       <div class="input-actions">
         <button id="btn-clear" title="清空">✕</button>
         <button id="btn-go" class="primary">翻译</button>
@@ -85,9 +86,29 @@
   <section id="page-vocab" class="page">
     <div class="vocab-toolbar">
       <input id="vocab-search" type="search" placeholder="搜索生词本…">
+      <button id="btn-review" class="primary">复习</button>
       <button id="btn-export">导出</button>
       <button id="btn-clear-vocab" class="danger">清空</button>
     </div>
+
+    <!-- 复习模式：卡片式自测，记住/没记住会记录到生词本统计 -->
+    <div id="review-panel" class="hidden">
+      <div class="review-head">
+        <span id="review-progress">1 / 20</span>
+        <button id="btn-review-exit">退出复习</button>
+      </div>
+      <div id="review-card" class="review-card">
+        <div id="review-question" class="review-question"></div>
+        <div id="review-answer" class="review-answer hidden"></div>
+      </div>
+      <div id="review-actions" class="review-actions">
+        <button id="btn-review-show" class="primary">显示答案</button>
+        <button id="btn-review-right" class="hidden">记住了</button>
+        <button id="btn-review-wrong" class="hidden danger">没记住</button>
+      </div>
+      <div id="review-done" class="review-done hidden"></div>
+    </div>
+
     <ul id="vocab-list" class="vocab-list"></ul>
     <p id="vocab-empty" class="empty">生词本还是空的，去翻译点什么吧～</p>
   </section>
@@ -100,7 +121,7 @@
   <br>数据仅保存在你的账号空间 · 支持离线安装
 </footer>
 
-<script src="dict-loader.js?v=36"></script>
-<script src="app.js?v=36"></script>
+<script src="dict-loader.js?v=37"></script>
+<script src="app.js?v=37"></script>
 </body>
 </html>

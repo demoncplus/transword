@@ -44,7 +44,7 @@ const IDS = ['src','result','result-src','result-text','result-dict','saved-tip'
   'btn-review','review-panel','review-progress','review-card','review-question',
   'review-answer','review-actions','review-done',
   'btn-review-show','btn-review-right','btn-review-wrong','btn-review-exit',
-  'sync-status','offline-status','sync-login','sync-info','sync-hint',
+  'sync-status','offline-status','sync-login','sync-info','sync-hint','sync-toggle',
   'sync-user','sync-pass','sync-user-err','sync-pass-err',
   'btn-sync-login','btn-sync-register','btn-sync-logout','btn-toggle-pass','sync-user-label'];
 const elements = {};
@@ -808,6 +808,28 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
         /e\.isComposing\).*composing\) return|\(e && e\.isComposing\) \|\| composing/.test(APP_SRC));
   check('11j-8 组字标志有兜底重置（防输入法不发 compositionend 卡死）',
         /blur[\s\S]{0,120}composing = false/.test(APP_SRC));
+  store['tw_vocab'] = '[]';
+  boot();
+
+  console.log('\n== 11k. 登录框默认折叠（把首屏留给翻译）==');
+  store['tw_vocab'] = '[]';
+  boot();
+  check('11k-1 未登录时登录框收起，只显示一行入口',
+        elements['sync-login']._classes.has('hidden') && !elements['sync-toggle']._classes.has('hidden'));
+  click('sync-toggle');
+  check('11k-2 点入口后展开登录框',
+        !elements['sync-login']._classes.has('hidden') && elements['sync-toggle']._classes.has('hidden'));
+  check('11k-3 展开后显示字段规则提示', !elements['sync-hint']._classes.has('hidden'));
+  // 已登录时不再显示入口
+  store['tw_sync_user'] = 'tester01';
+  store['tw_sync_token'] = 'faketoken';
+  boot();
+  check('11k-4 已登录时显示账号信息、隐藏入口',
+        !elements['sync-info']._classes.has('hidden') &&
+        elements['sync-toggle']._classes.has('hidden') &&
+        elements['sync-login']._classes.has('hidden'));
+  delete store['tw_sync_user'];
+  delete store['tw_sync_token'];
   store['tw_vocab'] = '[]';
   boot();
 

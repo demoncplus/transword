@@ -150,6 +150,14 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 14px
 .sync-status.warn { color: #c8891a; }
 .sync-pairing { margin: 0 0 14px; padding: 10px; background: #eef1fb; border-radius: 12px; }
 .sync-pairing .sync-hint { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+/* 未登录时的折叠标题：一行高度，不抢翻译区空间 */
+.sync-toggle {
+  width: 100%; display: block; text-align: left;
+  background: transparent; border: none; box-shadow: none;
+  color: var(--primary); font-size: 14px; font-weight: 600;
+  padding: 8px 6px; min-height: 40px; cursor: pointer;
+}
+.sync-toggle:active { opacity: .65; }
 #sync-login { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
 .sync-field { flex: 1 1 150px; min-width: 0; }
 .sync-field input {

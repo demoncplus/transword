@@ -648,8 +648,11 @@
     } catch (e) {}
     renderSyncBox();
   }
+  // 未登录时登录框默认折叠，翻译页首屏留给翻译本身；
+  // 用户点一下标题才展开（登录是一次性动作，不该长期占用首屏）。
+  var syncExpanded = false;
   function renderSyncBox() {
-    var login = $('sync-login'), info = $('sync-info'), hint = $('sync-hint');
+    var login = $('sync-login'), info = $('sync-info'), hint = $('sync-hint'), toggle = $('sync-toggle');
     if (!login || !info) return;
     var name = '';
     try { name = localStorage.getItem(LS_USER) || ''; } catch (e) {}
@@ -657,11 +660,19 @@
       login.classList.add('hidden');
       info.classList.remove('hidden');
       if (hint) hint.classList.add('hidden');
+      if (toggle) toggle.classList.add('hidden');
       $('sync-user-label').textContent = '已登录：' + name;
     } else {
-      login.classList.remove('hidden');
       info.classList.add('hidden');
-      if (hint) hint.classList.remove('hidden');
+      if (syncExpanded) {
+        login.classList.remove('hidden');
+        if (hint) hint.classList.remove('hidden');
+        if (toggle) toggle.classList.add('hidden');
+      } else {
+        login.classList.add('hidden');
+        if (hint) hint.classList.add('hidden');
+        if (toggle) toggle.classList.remove('hidden');
+      }
     }
   }
   function syncBaseUrl() {
@@ -1319,6 +1330,14 @@
 
   $('btn-sync-login').onclick = function () { submitSync('login'); };
   $('btn-sync-register').onclick = function () { submitSync('register'); };
+  // 点标题展开登录框，展开后把光标放到用户名，省一次点击
+  if ($('sync-toggle')) {
+    $('sync-toggle').onclick = function () {
+      syncExpanded = true;
+      renderSyncBox();
+      if ($('sync-user')) $('sync-user').focus();
+    };
+  }
   $('btn-sync-logout').onclick = function () {
     // 先通知服务器废弃令牌，再本地清除；即使服务器调用失败也照常退出。
     syncApi('/logout', 'POST').catch(function () {}).then(function () {

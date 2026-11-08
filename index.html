@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#4a6cf7">
 <title>译词通 - 英汉翻译 · 自动生词本</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=44">
+<link rel="stylesheet" href="style.css?v=45">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 </head>
@@ -121,9 +121,29 @@
   <div id="sync-status" class="sync-status hidden"></div>
   线上版自动使用高质量翻译引擎 · 登录后生词本跨设备同步
   <br>数据仅保存在你的账号空间 · 支持离线安装
+  <br><button id="btn-feedback" type="button" class="feedback-link">💬 意见反馈</button>
 </footer>
 
-<script src="dict-loader.js?v=44"></script>
-<script src="app.js?v=44"></script>
+<!-- 意见反馈弹层：真人测试阶段收集真实意见，匿名可提交 -->
+<div id="feedback-mask" class="feedback-mask hidden">
+  <div class="feedback-card">
+    <div class="feedback-title">你的意见很重要</div>
+    <div class="feedback-sub">用起来哪里不顺手？希望加什么？随便说说都行。</div>
+    <div id="fb-stars" class="fb-stars">
+      <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span>
+      <span data-v="4">★</span><span data-v="5">★</span>
+    </div>
+    <textarea id="fb-text" rows="4" placeholder="例如：查词很快，但希望单词能听发音 / 生词本希望能按字母排序…" maxlength="2000"></textarea>
+    <input id="fb-contact" type="text" placeholder="联系方式（选填，方便回访）" maxlength="120">
+    <div id="fb-err" class="fb-err"></div>
+    <div class="fb-btns">
+      <button id="btn-fb-cancel" type="button">取消</button>
+      <button id="btn-fb-send" type="button" class="primary">提交</button>
+    </div>
+  </div>
+</div>
+
+<script src="dict-loader.js?v=45"></script>
+<script src="app.js?v=45"></script>
 </body>
 </html>

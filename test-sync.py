@@ -18,6 +18,9 @@ spec.loader.exec_module(mod)
 passed = 0
 failed = 0
 
+# 与服务端共用的管理密钥（测试里直接取模块常量，避免写死两份）
+ADMIN_KEY = mod.FEEDBACK_KEY
+
 
 def check(name, cond, extra=None):
     global passed, failed
@@ -116,6 +119,44 @@ with TemporaryDirectory(ignore_cleanup_errors=True) as d:
             limited = True
             break
     check("连续失败登录触发限流(429)", limited)
+
+    print("== 用户反馈收集 ==")
+    # 匿名提交（真人测试不需要注册就能提意见）
+    s, j = req(base, "POST", "/feedback",
+               {"rating": 5, "text": "查词很快，音标很有用", "contact": "tester@example.com"},
+               ip="8.8.8.8")
+    check("匿名提交反馈成功", s == 200 and j.get("ok"), (s, j))
+    s, j = req(base, "POST", "/feedback", {"rating": 2, "text": "希望加发音速度调节"}, ip="8.8.8.8")
+    check("可提交纯文字+评分", s == 200, (s, j))
+    s, j = req(base, "POST", "/feedback", {"rating": 0, "text": ""}, ip="8.8.8.9")
+    check("空反馈被拒绝(400)", s == 400, (s, j))
+    # 评分越界应被夹到 0..5，而不是报错或存脏值
+    s, j = req(base, "POST", "/feedback", {"rating": 99, "text": "评分越界测试"}, ip="8.8.8.10")
+    check("评分越界被接受(夹取)", s == 200, (s, j))
+
+    print("== 反馈读取权限 ==")
+    s, j = req(base, "GET", "/feedback")
+    check("无密钥查看反馈被拒绝(403)", s == 403, (s, j))
+    s, j = req(base, "GET", "/feedback?key=wrong-key")
+    check("错误密钥被拒绝(403)", s == 403, (s, j))
+    s, j = req(base, "GET", "/feedback?key=" + ADMIN_KEY)
+    check("正确密钥可查看反馈", s == 200 and j.get("ok"), (s, j))
+    check("反馈条数正确(3 条)", j.get("total") == 3, j.get("total"))
+    check("平均评分已统计", j.get("avg_rating", 0) > 0, j.get("avg_rating"))
+    items = j.get("items") or []
+    check("最新反馈排在最前", bool(items) and items[0].get("text") == "评分越界测试", items[0] if items else None)
+    check("越界评分被夹到 5", bool(items) and items[0].get("rating") == 5, items[0] if items else None)
+    check("反馈内容完整保存",
+          any("查词很快" in (x.get("text") or "") for x in items), [x.get("text") for x in items])
+
+    print("== 反馈限流 ==")
+    fb_limited = False
+    for _ in range(10):
+        s, _j = req(base, "POST", "/feedback", {"rating": 3, "text": "刷屏测试"}, ip="9.9.9.9")
+        if s == 429:
+            fb_limited = True
+            break
+    check("连续提交反馈触发限流(429)", fb_limited)
 
     server.shutdown()
     server.server_close()

@@ -17,6 +17,8 @@
   GET  /whoami   (Bearer token)      -> {ok,username}
   GET  /vocab    (Bearer token)      -> {vocab}
   PUT  /vocab    (Bearer token)      -> {ok,count}
+  POST /feedback {rating,text,contact}-> {ok,total}   匿名可提交，按 IP 限速
+  GET  /feedback?key=ADMIN_KEY       -> {total,avg_rating,items}  只读查看
 """
 import hashlib
 import json
@@ -40,7 +42,9 @@ LOCK = threading.Lock()
 
 USER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{3,19}$")
 CODE_RE = re.compile(r"^[a-f0-9]{36}$")
-RATE_LIMIT = {"login": 10, "register": 5}
+# 查看用户反馈的管理密钥（可用环境变量覆盖，绝不写进前端代码）
+FEEDBACK_KEY = os.environ.get("TRANSWORD_FEEDBACK_KEY", "twfb-7Qm4xK9pR2vL")
+RATE_LIMIT = {"login": 10, "register": 5, "feedback": 6}
 _hits = {}
 _hits_lock = threading.Lock()
 
@@ -81,6 +85,17 @@ def init_db():
           updated_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_tokens_user ON tokens(username);
+        -- 用户反馈（真人测试意见）：不需要登录，匿名可提交
+        CREATE TABLE IF NOT EXISTS feedback(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          rating INTEGER NOT NULL DEFAULT 0,
+          text TEXT NOT NULL DEFAULT '',
+          contact TEXT NOT NULL DEFAULT '',
+          ua TEXT NOT NULL DEFAULT '',
+          ip TEXT NOT NULL DEFAULT '',
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_feedback_time ON feedback(created_at DESC);
         """)
 
 
@@ -220,6 +235,33 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
+        if path == "/feedback":
+            # 匿名可提交（真人测试不需要注册就能提意见），按 IP 限速防刷
+            if not allow("feedback", self._client_ip()):
+                self._json(429, {"error": "too-many-requests"})
+                return
+            body = self._body(8 * 1024) or {}
+            raw_rating = body.get("rating", 0)
+            try:
+                rating = int(raw_rating)
+            except (TypeError, ValueError):
+                rating = 0
+            rating = max(0, min(5, rating))
+            text = body.get("text", "")
+            contact = body.get("contact", "")
+            text = text.strip()[:2000] if isinstance(text, str) else ""
+            contact = contact.strip()[:120] if isinstance(contact, str) else ""
+            if not text and not rating:
+                self._json(400, {"error": "empty-feedback"})
+                return
+            ua = (self.headers.get("User-Agent") or "")[:200]
+            with LOCK, db() as conn:
+                conn.execute(
+                    "INSERT INTO feedback(rating,text,contact,ua,ip,created_at) VALUES(?,?,?,?,?,?)",
+                    (rating, text, contact, ua, self._client_ip(), int(time.time())))
+                total = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
+            self._json(200, {"ok": True, "total": total})
+            return
         if path == "/register":
             if not allow("register", self._client_ip()):
                 self._json(429, {"error": "too-many-requests"})
@@ -266,6 +308,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
+        if path == "/feedback":
+            # 只读查看反馈，需要管理密钥（密钥不写进前端，只在服务端/命令行用）
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            if (qs.get("key", [""])[0] or "") != FEEDBACK_KEY:
+                self._json(403, {"error": "forbidden"})
+                return
+            try:
+                limit = max(1, min(500, int(qs.get("limit", ["100"])[0])))
+            except ValueError:
+                limit = 100
+            with LOCK, db() as conn:
+                rows = conn.execute(
+                    "SELECT id,rating,text,contact,ua,created_at FROM feedback "
+                    "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+                total = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
+                avg = conn.execute("SELECT AVG(rating) FROM feedback WHERE rating>0").fetchone()[0]
+            items = [{"id": r[0], "rating": r[1], "text": r[2], "contact": r[3],
+                      "ua": r[4][:80], "at": r[5]} for r in rows]
+            self._json(200, {"ok": True, "total": total,
+                             "avg_rating": round(avg, 2) if avg else 0, "items": items})
+            return
         if path == "/whoami":
             auth = self.headers.get("Authorization", "")
             user = token_user(auth[7:].strip()) if auth.startswith("Bearer ") else None

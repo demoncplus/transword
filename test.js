@@ -6,10 +6,28 @@ const vm = require('vm');
 function makeEl(id) {
   const e = {
     id, value: '', textContent: '', placeholder: '',
-    style: {}, children: [], _classes: new Set(), _ev: {}, onclick: null,
+    style: {}, children: [], _classes: new Set(), _ev: {}, onclick: null, tagName: 'div',
     addEventListener(t, f) { e._ev[t] = f; },
     focus() {},
-    appendChild(c) { e.children.push(c); return c; }
+    appendChild(c) { e.children.push(c); return c; },
+    // 递归查找子元素（真实 DOM 的行为，反馈星星等需要遍历子节点）
+    getElementsByTagName(tag) {
+      const out = [], t = String(tag).toLowerCase();
+      (function walk(list) {
+        (list || []).forEach(c => {
+          if (c && String(c.tagName).toLowerCase() === t) out.push(c);
+          walk(c && c.children);
+        });
+      })(e.children);
+      return out;
+    },
+    querySelectorAll(sel) {
+      return e.getElementsByTagName(String(sel).replace(/^[.#]/, ''));
+    },
+    querySelector(sel) {
+      const list = e.querySelectorAll(sel);
+      return list.length ? list[0] : null;
+    }
   };
   // 真实浏览器里 innerHTML='' 会清空子节点，桩必须一致，
   // 否则 renderVocab() 每次重建列表时旧节点会残留，子节点数永远只增不减。
@@ -46,7 +64,9 @@ const IDS = ['src','result','result-src','result-text','result-dict','saved-tip'
   'btn-review-show','btn-review-right','btn-review-wrong','btn-review-exit',
   'sync-status','offline-status','sync-login','sync-info','sync-hint','sync-toggle',
   'sync-user','sync-pass','sync-user-err','sync-pass-err',
-  'btn-sync-login','btn-sync-register','btn-sync-logout','btn-toggle-pass','sync-user-label'];
+  'btn-sync-login','btn-sync-register','btn-sync-logout','btn-toggle-pass','sync-user-label',
+  'btn-feedback','feedback-mask','fb-stars','fb-text','fb-contact','fb-err',
+  'btn-fb-cancel','btn-fb-send'];
 const elements = {};
 IDS.forEach(id => elements[id] = makeEl(id));
 
@@ -833,6 +853,57 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('11m-7 分段后拼回内容不丢字',
         segs.join('').replace(/\s+/g, ' ').trim() === longText.replace(/\s+/g, ' ').trim());
   check('11m-8 短文本不分段', splitFn('good morning', 180).length === 1);
+
+  console.log('\n== 11n. 意见反馈（真人测试收集意见）==');
+  store['tw_vocab'] = '[]';
+  boot();
+  const htmlFb = fs.readFileSync('index.html', 'utf8');
+  check('11n-1 页面有反馈入口', /id="btn-feedback"/.test(htmlFb));
+  check('11n-2 反馈弹层默认隐藏（源码带 hidden）',
+        /id="feedback-mask"[^>]*class="[^"]*hidden/.test(htmlFb));
+  click('btn-feedback');
+  check('11n-3 点入口打开反馈弹层', !elements['feedback-mask']._classes.has('hidden'));
+  // 什么都没填直接提交 → 应被拦住
+  elements['fb-text'].value = '';
+  click('btn-fb-send');
+  check('11n-4 空反馈提交被拦住并提示',
+        /写两句|星星/.test(elements['fb-err'].textContent), elements['fb-err'].textContent);
+  check('11n-5 空反馈不发请求', !global.fetch);
+  // 填内容后提交（前面的离线小节把 onLine 设成了 false，这里必须先复位）
+  // boot() 是把 global.fetch 作为参数注入 app.js 的，所以换 mock 后必须重新 boot
+  navigator.onLine = true;
+  let fbBody = null;
+  global.fetch = (url, opts) => {
+    fbBody = JSON.parse(opts.body);
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, total: 1 }) });
+  };
+  store['tw_vocab'] = '[]';
+  boot();
+  click('btn-feedback');
+  elements['fb-text'].value = '查词很快，希望加发音';
+  click('btn-fb-send');
+  await sleep(300);
+  check('11n-6 反馈提交到 sync 服务的 /feedback',
+        !!fbBody && fbBody.text === '查词很快，希望加发音', fbBody);
+  check('11n-6b 提交成功后页面内致谢，不用 alert 阻塞',
+        /谢谢，已收到/.test(APP_SRC) && !/alert\('谢谢/.test(APP_SRC));
+  // 致谢后 1.6 秒自动关闭
+  await sleep(1800);
+  check('11n-7 提交成功后自动关闭弹层', elements['feedback-mask']._classes.has('hidden'));
+  delete global.fetch;
+  // 离线时提交应被拦
+  boot();
+  click('btn-feedback');
+  navigator.onLine = false;
+  elements['fb-text'].value = '离线测试';
+  click('btn-fb-send');
+  check('11n-8 离线时提示联网后再提交',
+        /离线/.test(elements['fb-err'].textContent), elements['fb-err'].textContent);
+  navigator.onLine = true;
+  check('11n-9 管理密钥不在前端代码里（只有服务端持有）',
+        !/twfb-/.test(APP_SRC) && !/twfb-/.test(fs.readFileSync('index.html', 'utf8')));
+  store['tw_vocab'] = '[]';
+  boot();
 
   console.log('\n== 11j. 输入联想（边打边提示）==');
   store['tw_vocab'] = '[]';

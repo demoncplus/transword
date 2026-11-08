@@ -1442,6 +1442,91 @@
     inp.type = (inp.type === 'password') ? 'text' : 'password';
   };
 
+  // ========== 意见反馈（真人测试阶段收集真实意见） ==========
+  var fbRating = 0;
+  function renderStars() {
+    var box = $('fb-stars');
+    if (!box) return;
+    var spans = box.getElementsByTagName('span');
+    for (var i = 0; i < spans.length; i++) {
+      spans[i].className = (i < fbRating) ? 'on' : '';
+    }
+  }
+  function openFeedback() {
+    fbRating = 0;
+    renderStars();
+    if ($('fb-text')) $('fb-text').value = '';
+    if ($('fb-contact')) $('fb-contact').value = '';
+    if ($('fb-err')) $('fb-err').textContent = '';
+    $('feedback-mask').classList.remove('hidden');
+  }
+  function closeFeedback() {
+    if ($('feedback-mask')) $('feedback-mask').classList.add('hidden');
+  }
+  function submitFeedback() {
+    var text = ($('fb-text').value || '').trim();
+    if (!fbRating && !text) {
+      $('fb-err').textContent = '写两句，或点个星星吧～';
+      return;
+    }
+    if (navigator.onLine === false) {
+      $('fb-err').textContent = '当前离线，联网后再提交';
+      return;
+    }
+    var btn = $('btn-fb-send');
+    btn.disabled = true;
+    btn.textContent = '提交中…';
+    $('fb-err').textContent = '';
+    fetch(syncBaseUrl() + '/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rating: fbRating,
+        text: text,
+        contact: ($('fb-contact').value || '').trim()
+      })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok) {
+        // 不用 alert：它会阻塞页面（无头浏览器直接卡死），手机上也突兀。
+        // 改成弹层内提示 + 自动关闭。
+        var card = $('feedback-mask');
+        $('fb-err').textContent = '';
+        $('fb-text').value = '';
+        $('fb-contact').value = '';
+        fbRating = 0;
+        renderStars();
+        var titleEl = card.querySelector('.feedback-title');
+        var subEl = card.querySelector('.feedback-sub');
+        if (titleEl) titleEl.textContent = '🙏 谢谢，已收到！';
+        if (subEl) subEl.textContent = '你的意见会用来改进这个工具。';
+        setTimeout(function () {
+          closeFeedback();
+          if (titleEl) titleEl.textContent = '你的意见很重要';
+          if (subEl) subEl.textContent = '用起来哪里不顺手？希望加什么？随便说说都行。';
+        }, 1600);
+      } else {
+        $('fb-err').textContent = '提交失败，请稍后再试';
+      }
+    }).catch(function () {
+      $('fb-err').textContent = '网络异常，请稍后再试';
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = '提交';
+    });
+  }
+  if ($('btn-feedback')) {
+    $('btn-feedback').onclick = openFeedback;
+    $('btn-fb-cancel').onclick = closeFeedback;
+    $('btn-fb-send').onclick = submitFeedback;
+    $('feedback-mask').onclick = function (e) {
+      if (e.target === $('feedback-mask')) closeFeedback();   // 点遮罩关闭
+    };
+    $('fb-stars').onclick = function (e) {
+      var v = e.target && e.target.getAttribute ? e.target.getAttribute('data-v') : null;
+      if (v) { fbRating = parseInt(v, 10); renderStars(); }
+    };
+  }
+
   renderSyncBox();
   // 打开页面时若已登录：校验令牌有效后拉取远端生词本；无效则清除登录态。
   if (isOnlinePage()) {

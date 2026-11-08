@@ -107,6 +107,34 @@ button:active, .chip:active, .tab:active, .lang-btn:active { transform: scale(0.
 .review-actions { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 .review-actions button { min-width: 110px; }
 .review-done { text-align: center; color: #2ba84a; font-size: 15px; margin-top: 14px; line-height: 1.7; }
+
+/* 意见反馈 */
+.feedback-link {
+  background: transparent; border: none; box-shadow: none; color: var(--primary);
+  font-size: 13px; padding: 8px 4px; min-height: 40px; cursor: pointer; text-decoration: underline;
+}
+.feedback-mask {
+  position: fixed; inset: 0; z-index: 100; background: rgba(16,20,32,.55);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.feedback-card {
+  width: 100%; max-width: 420px; background: var(--card); border-radius: 16px;
+  padding: 18px; box-shadow: 0 16px 44px rgba(0,0,0,.28);
+}
+.feedback-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.feedback-sub { font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.6; }
+.fb-stars { font-size: 30px; color: #d8dce8; letter-spacing: 4px; margin-bottom: 12px; cursor: pointer; user-select: none; }
+.fb-stars span.on { color: #f0a128; }
+.feedback-card textarea,
+.feedback-card input {
+  width: 100%; box-sizing: border-box; font-size: 16px; padding: 10px 12px;
+  border: 1.5px solid #dfe4f2; border-radius: 10px; margin-bottom: 10px;
+  background: var(--bg); color: var(--text); font-family: inherit;
+}
+.feedback-card textarea { resize: vertical; }
+.fb-err { color: #e05252; font-size: 13px; min-height: 18px; }
+.fb-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.fb-btns button { min-width: 88px; }
 .result-dict .pos { color: var(--primary); font-weight: 600; margin-right: 6px; }
 .saved-tip { margin-top: 10px; font-size: 13px; color: #2ba84a; }
 

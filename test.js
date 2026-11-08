@@ -214,20 +214,46 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   console.log('== 3. 汉译英：精确词典 ==');
   click('lang-zh2en');
   check('切换后输入框提示中文', /中文/.test(elements.src.placeholder), elements.src.placeholder);
-  elements.src.value = '你好';
-  click('btn-go');
-  await sleep(3000);
-  const zh2en = elements['result-text'].textContent;
+  // 轮询等待，而不是固定 sleep：上一节的 MyMemory 慢响应可能晚到并短暂覆盖结果。
+  // MyMemory 偶发极慢（>20 秒）时上一节的响应会残留到本节，故最多重试 2 次点查询，
+  // 既能暴露真实的"查不到"问题，又不会被外部接口抖动误报。
+  let zh2en = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    elements.src.value = '你好';
+    click('btn-go');
+    if (attempt === 0 && process.env.TW_DEBUG) {
+      console.log('  [debug-3] 点击后立刻:', JSON.stringify(elements['result-text'].textContent),
+                  '| srcValue:', JSON.stringify(elements.src.value));
+    }
+    for (let w = 0; w < 25; w++) {
+      await sleep(200);
+      zh2en = elements['result-text'].textContent;
+      if (/hello/i.test(zh2en)) break;
+    }
+    if (/hello/i.test(zh2en)) break;
+  }
   check('"你好"翻译含hello', /hello/i.test(zh2en), zh2en);
   vocab = JSON.parse(store['tw_vocab'] || '[]');
   check('汉译英也进生词本', vocab.length === 2, vocab.length);
 
   console.log('== 4. 离线兜底：断网时用词典 ==');
+  // 先等上一节的在途网络请求落地。MyMemory 慢响应若在第 4 节之后才回来，
+  // 会让断网断言读到上一节的句子译文（曾导致偶发误报）。
+  await sleep(3000);
   click('lang-en2zh');
   navigator.onLine = false;
   elements.src.value = 'beautiful';
+  const beforeClick = elements['result-text'].textContent;
   click('btn-go');
+  const rightAfter = elements['result-text'].textContent;
+  if (process.env.TW_DEBUG) {
+    console.log('  [debug] 点击前:', JSON.stringify(beforeClick), '| 点击后立刻:', JSON.stringify(rightAfter));
+  }
   await sleep(1500);
+  if (process.env.TW_DEBUG) {
+    console.log('  [debug] 1.5 秒后:', JSON.stringify(elements['result-text'].textContent),
+                '| dict:', JSON.stringify(elements['result-dict'].innerHTML.slice(0, 50)));
+  }
   const offline = elements['result-text'].textContent;
   check('断网仍有离线词典结果', /漂亮|美丽|美好/.test(offline), offline);
   check('断网查词标注离线词典', /离线词典/.test(elements['result-dict'].innerHTML), elements['result-dict'].innerHTML);
@@ -777,6 +803,11 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
         /ArrowDown/.test(APP_SRC) && /ArrowUp/.test(APP_SRC) &&
         /highlightSuggest/.test(APP_SRC) && /Escape/.test(APP_SRC));
   check('11j-6 选中项有高亮样式', /\.suggest-item\.active/.test(fs.readFileSync('style.css', 'utf8')));
+  check('11j-7 中文输入法组字期间不联想不翻译',
+        /compositionstart/.test(APP_SRC) && /compositionend/.test(APP_SRC) &&
+        /e\.isComposing\).*composing\) return|\(e && e\.isComposing\) \|\| composing/.test(APP_SRC));
+  check('11j-8 组字标志有兜底重置（防输入法不发 compositionend 卡死）',
+        /blur[\s\S]{0,120}composing = false/.test(APP_SRC));
   store['tw_vocab'] = '[]';
   boot();
 

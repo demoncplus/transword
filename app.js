@@ -1141,9 +1141,17 @@
     box.classList.remove('hidden');
   }
 
-  srcEl.addEventListener('input', function () {
+  // 中文输入法（IME）组字处理：
+  // 拼音组字过程中会连续触发 input，此时输入框里的内容是拼音/半截汉字，
+  // 若照常触发联想和自动翻译，会去查 "zhi"、"知" 这类无意义内容，既浪费请求又闪结果。
+  // 判定优先用 input 事件自带的 e.isComposing（浏览器保证准确），
+  // 再辅以 composition 事件维护的 composing 标志（个别输入法只发其中之一）。
+  var composing = false;
+  function handleSrcInput(e) {
     clearTimeout(autoTranslateTimer);
     clearTimeout(suggestTimer);
+    // 组字中：什么都不做（e.isComposing 比自定义标志更可靠）
+    if ((e && e.isComposing) || composing) return;
     var val = srcEl.value.trim();
     if (!val) { hideSuggest(); return; }
     // 联想稍快（200ms）出结果；自动翻译在有联想时延后，给用户点选时间
@@ -1158,9 +1166,23 @@
       hideSuggest();
       doTranslate();
     }, 800);
+  }
+  srcEl.addEventListener('input', handleSrcInput);
+  srcEl.addEventListener('compositionstart', function () {
+    composing = true;
+    clearTimeout(autoTranslateTimer);
+    clearTimeout(suggestTimer);
+    hideSuggest();
   });
-  // 失焦/换页时收起联想
-  srcEl.addEventListener('blur', function () { setTimeout(hideSuggest, 150); });
+  srcEl.addEventListener('compositionend', function () {
+    composing = false;
+    handleSrcInput();                   // 组字完成，按最终文本处理一次
+  });
+  // 失焦时重置组字标志并收起联想（防止个别输入法不发 compositionend 导致标志卡死）
+  srcEl.addEventListener('blur', function () {
+    composing = false;
+    setTimeout(hideSuggest, 150);
+  });
 
   // 用户主动点语言按钮 → 聚焦输入框，方便直接打字
   $('lang-en2zh').onclick = function () { setLang('en2zh', true); };

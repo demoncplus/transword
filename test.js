@@ -459,7 +459,8 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
   check('10.7a 不把原汉字混进英文（无「备 use」）', !/[\u4e00-\u9fff]\s*[A-Za-z]/.test(bad), bad);
   check('10.7a2 不含原字', !/龘|靐|齉|爩/.test(bad), bad);
   check('10.7b 两条路都不可用时如实显示「暂无翻译」', /暂无翻译/.test(bad), bad);
-  check('10.7c 明确提示引擎未启动', /引擎未启动|translate-api\.py/.test(elements['result-dict'].innerHTML),
+  check('10.7c 明确提示在线翻译也没结果（不谎称已翻译）',
+        /在线翻译也没能返回结果/.test(elements['result-dict'].innerHTML),
         elements['result-dict'].innerHTML);
   const vv7 = JSON.parse(store['tw_vocab'] || '[]');
   // 用户要求"所有主动搜索过的单词、句子自动放进生词本"，
@@ -813,6 +814,25 @@ function click(id) { const e = elements[id]; if (!e.onclick) throw new Error('no
         elements.src.value);
   store['tw_vocab'] = '[]';
   boot();
+
+  console.log('\n== 11m. 长文本分段翻译（引擎单次有长度上限）==');
+  check('11m-1 有分段函数（按句子切，不劈开单句）',
+        /function splitForEngine/.test(APP_SRC) && APP_SRC.indexOf('splitForEngine(text, 180)') > 0);
+  check('11m-2 分段后并行翻译并拼接', /function translateSegments/.test(APP_SRC) && /results\.join/.test(APP_SRC));
+  check('11m-3 任一段失败则整体判失败（不给残缺译文）',
+        /for \(var i = 0; i < results\.length; i\+\+\) if \(!results\[i\]\) return null/.test(APP_SRC));
+  check('11m-4 引擎超时可按需延长（长句用更久）',
+        /function customTranslate\(endpoint, text, langpair, timeoutMs\)/.test(APP_SRC));
+  check('11m-5 未收录词不再显示方括号', !/results\.push\('\[' \+ w \+ '\]'\)/.test(APP_SRC));
+  // 分段逻辑的行为验证：长句应被切成多段且拼回长度接近原文
+  const splitFn = new Function('return ' + APP_SRC.match(/function splitForEngine[\s\S]*?\n  \}/)[0].replace(/^function splitForEngine/, 'function'))() ;
+  const longText = 'The quick brown fox jumps over the lazy dog. '.repeat(10).trim();
+  const segs = splitFn(longText, 180);
+  check('11m-6 长文本被切成多段且每段不超过上限',
+        segs.length > 1 && segs.every(s => s.length <= 180), segs.length + ' 段');
+  check('11m-7 分段后拼回内容不丢字',
+        segs.join('').replace(/\s+/g, ' ').trim() === longText.replace(/\s+/g, ' ').trim());
+  check('11m-8 短文本不分段', splitFn('good morning', 180).length === 1);
 
   console.log('\n== 11j. 输入联想（边打边提示）==');
   store['tw_vocab'] = '[]';

@@ -119,7 +119,9 @@
           var ws = firstSense(trans);
           if (ws) results.push(ws);
         } else {
-          results.push('[' + w + ']');
+          // 未收录的词保留原文。原来包成 "[fox]" 用户看不懂这个方括号是什么意思，
+          // 整句已经有"逐词直译仅供参考"的标注，保留原词反而更好读。
+          results.push(w);
         }
         i++;
       }
@@ -275,10 +277,11 @@
 
   // 自建接口：GET {endpoint}?text=..&langpair=en|zh-CN
   // 返回 JSON {translatedText|translation|text} 或纯文本译文（协议与 MyMemory 兼容）
-  function customTranslate(endpoint, text, langpair) {
+  function customTranslate(endpoint, text, langpair, timeoutMs) {
     return new Promise(function (resolve) {
       var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
+      // 超时按调用方要求（长句/分段需要更久），默认 8 秒保证短查询不卡死
+      var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, timeoutMs || 8000);
       var sep = endpoint.indexOf('?') >= 0 ? '&' : '?';
       var url = endpoint + sep + 'text=' + encodeURIComponent(text) +
         '&langpair=' + encodeURIComponent(langpair);
@@ -335,6 +338,52 @@
     cands.sort(function (a, b) { return b.m - a.m; });
     var best = cands[0].t.trim();
     return best || null;
+  }
+
+  // 超长文本直接发给引擎必然超时（引擎单次有长度上限），
+  // 这里按句子切成不超过 maxLen 的段，逐段翻译后再按原顺序拼回去。
+  // 句子边界优先，避免把一句话从中间劈开导致译文错乱。
+  function splitForEngine(text, maxLen) {
+    var s = String(text == null ? '' : text).trim();
+    if (!s) return [];
+    if (s.length <= maxLen) return [s];
+    var parts = s.match(/[^.!?。！？；;\n]+[.!?。！？；;\n]*/g) || [s];
+    var segs = [], cur = '';
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.length > maxLen) {                 // 单句本身超长，硬切
+        if (cur) { segs.push(cur); cur = ''; }
+        for (var j = 0; j < p.length; j += maxLen) segs.push(p.slice(j, j + maxLen));
+        continue;
+      }
+      if ((cur + p).length > maxLen) { segs.push(cur); cur = p; }
+      else cur += p;
+    }
+    if (cur) segs.push(cur);
+    return segs;
+  }
+
+  // 分段并行翻译：最多 3 路并发，任一段失败就整体判失败
+  //（宁可不给结果，也不给一段残缺译文让用户误以为翻译完了）
+  function translateSegments(endpoint, text, langpair) {
+    var segs = splitForEngine(text, 180);
+    if (segs.length <= 1) return customTranslate(endpoint, text, langpair, 12000);
+    var results = new Array(segs.length);
+    var cursor = 0;
+    function worker() {
+      if (cursor >= segs.length) return Promise.resolve();
+      var my = cursor++;
+      return customTranslate(endpoint, segs[my], langpair, 15000).then(function (r) {
+        results[my] = r;
+        return worker();
+      });
+    }
+    var pool = [];
+    for (var k = 0; k < Math.min(3, segs.length); k++) pool.push(worker());
+    return Promise.all(pool).then(function () {
+      for (var i = 0; i < results.length; i++) if (!results[i]) return null;
+      return results.join(' ');
+    });
   }
 
   function onlineTranslate(text, langpair) {
@@ -457,7 +506,7 @@
     if (!isEntryShaped && navigator.onLine !== false) {
       var lp0 = effLang === 'zh2en' ? 'zh-CN|en' : 'en|zh-CN';
       var api0 = getApiUrl();
-      if (api0) enginePromise = customTranslate(api0, text, lp0);
+      if (api0) enginePromise = translateSegments(api0, text, lp0);
     }
 
     // 公网首访只下载当前查询涉及的词典分片，而不是首屏下载全部 2.9MB。
@@ -497,7 +546,7 @@
   function translateOnlineOnly(text, mySeq, effLang, flipped) {
     var langpair = effLang === 'zh2en' ? 'zh-CN|en' : 'en|zh-CN';
     var api = getApiUrl();
-    var chain = api ? customTranslate(api, text, langpair) : Promise.resolve(null);
+    var chain = api ? translateSegments(api, text, langpair) : Promise.resolve(null);
     chain.then(function (r) {
       return r ? { text: r, source: '🏠 自建接口' } : onlineTranslate(text, langpair).then(function (x) {
         return x ? { text: x, source: '🌐 免费接口（MyMemory）' } : null;
@@ -577,7 +626,7 @@
           return r ? { text: r, source: '🏠 自建接口' } : null;
         })
       : (api
-          ? customTranslate(api, text, langpair).then(function (r) {
+          ? translateSegments(api, text, langpair).then(function (r) {
               return r ? { text: r, source: '🏠 自建接口' } : null;
             })
           : Promise.resolve(null));
@@ -605,16 +654,16 @@
           resultText.textContent = res.text;
           resultDict.innerHTML = '<div style="color:#c8891a;font-size:13px;">' +
             '⚡ 离线逐词直译（词序可能不准，仅供参考）。<br>' +
-            '如需准确句子翻译，请运行 translate-api.py 启动引擎。</div>';
+            '在线翻译暂时不可用，联网后重查可得到准确译文。</div>';
           addToVocab(text, res.text, false, effLang, 'literal'); // 收录但标注为参考
           savedTip.classList.add('hidden');
         } else {
           // 残句/无结果绝不能当译文，如实告知；但仍然收录进生词本（用户要求搜过的都记录）
           resultText.textContent = '暂无翻译';
           resultDict.innerHTML = '<div style="color:#e05252;font-size:13px;">' +
-            '离线词典未收录该词，且翻译引擎未启动。<br>' +
-            '请运行 translate-api.py 后重试（已启动引擎时可断网使用）。<br>' +
-            '<span style="color:#888;">该词已记入生词本，待引擎可用时重查即可补上译文。</span></div>';
+            '离线词典未收录，在线翻译也没能返回结果。<br>' +
+            '请检查网络后重试，或换个说法再查一次。<br>' +
+            '<span style="color:#888;">该词已记入生词本，联网后重查即可补上译文。</span></div>';
           addToVocab(text, '', false, effLang, 'pending');
           savedTip.classList.add('hidden');
         }

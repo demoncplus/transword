@@ -1118,18 +1118,33 @@
     // 对照成熟翻译站：一键复制译文
     var text = resultText.textContent || '';
     if (!text || text === '翻译中…') return;
-    var done = function () {
-      var btn = $('btn-copy'), old = btn.textContent;
-      btn.textContent = '✓';
-      setTimeout(function () { btn.textContent = old; }, 1200);
+    var btn = $('btn-copy');
+    var old = btn.textContent;
+    var done = function (ok) {
+      btn.textContent = ok ? '✓' : '✗';
+      btn.title = ok ? '已复制' : '复制失败，请长按选择';
+      setTimeout(function () { btn.textContent = old; btn.title = '复制译文'; }, 1200);
+    };
+    // execCommand 回退：非 HTTPS、权限被拒、部分 WebView 里 clipboard API 会失败，
+    // 原来 catch 里什么都不做 → 用户点了按钮毫无反应，以为坏了。
+    var fallback = function () {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      ta.setAttribute('readonly', '');
+      document.body.appendChild(ta);
+      ta.select();
+      try { ta.setSelectionRange(0, ta.value.length); } catch (e) {}
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      done(ok);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done).catch(function () {});
+      navigator.clipboard.writeText(text).then(function () { done(true); }).catch(fallback);
     } else {
-      var ta = document.createElement('textarea');
-      ta.value = text; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); done(); } catch (e) {}
-      document.body.removeChild(ta);
+      fallback();
     }
   };
   $('btn-speak').onclick = function () {

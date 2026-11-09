@@ -18,3 +18,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 Desktop.ini
+# 推广文案与平台策略（本地留存，不入库）
+
+发布材料-*/
+
+*.log

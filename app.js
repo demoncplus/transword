@@ -1579,9 +1579,10 @@
       }, 30000);
       // 词典预热：SW 缓存好完整词典后，直接读缓存注入内存，
       // 之后所有查询走内存词典（毫秒级），不再逐个下载分片。
-      // 首次访问时缓存还没建好，所以按 3s/10s/25s/45s 重试几次，成功后停止。
+      // 打开即预热：0s 立即尝试（离线重开时缓存已就绪，第一次查词即命中内存、几乎零等待）；
+      // 首次在线访问缓存可能还没建好，所以再按 3s/10s/25s/45s 重试几次，成功后停止。
       if (!dictLoader || !window.caches) return;
-      var warmTries = [3000, 10000, 25000, 45000];
+      var warmTries = [0, 3000, 10000, 25000, 45000];
       warmTries.forEach(function (delay) {
         setTimeout(function () {
           if (dictLoader.isWarm && dictLoader.isWarm()) return;
